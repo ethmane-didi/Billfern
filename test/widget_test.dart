@@ -5,6 +5,7 @@ import 'package:billfern/core/router/app_destination.dart';
 import 'package:billfern/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:billfern/shared/widgets/floating_bottom_nav.dart';
 import 'package:billfern/features/settings/presentation/screens/settings_screen.dart';
+import 'package:billfern/features/subscriptions/presentation/screens/subscriptions_screen.dart';
 import 'package:billfern/shared/widgets/placeholder_view.dart';
 
 import 'helpers/fixed_clock.dart';
@@ -53,9 +54,11 @@ void main() {
         reason: 'selected tab reports its selected state',
       );
       expect(
-        destination == AppDestination.settings
-            ? find.byType(SettingsScreen)
-            : find.widgetWithText(PlaceholderView, destination.label),
+        switch (destination) {
+          AppDestination.settings => find.byType(SettingsScreen),
+          AppDestination.subscriptions => find.byType(SubscriptionsScreen),
+          _ => find.widgetWithText(PlaceholderView, destination.label),
+        },
         findsOneWidget,
         reason: 'destination screen is shown',
       );

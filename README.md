@@ -6,8 +6,9 @@ Billfern is a premium, AI-powered subscription tracker and personal finance app 
 iOS and Android. It helps people manage recurring payments, see upcoming renewals,
 find subscriptions they no longer need, and save money.
 
-> **Status:** early development. The design system, navigation shell and home dashboard
-> are in place. All data is mocked, and AI insights are local sample rules. There is no backend yet.
+> **Status:** early development. Users can manage their own subscriptions (add from an
+> 82-service catalog or create custom ones, edit, pause, resume and delete), stored locally
+> on the device. Exchange rates and AI insights are local sample data. There is no backend yet.
 
 ## Dashboard
 
@@ -41,6 +42,24 @@ The visual reference is [`docs/design/dashboard-reference.png`](docs/design/dash
   That script is the single source of truth for the catalog.
 
 Users will be able to search the catalog or add custom subscriptions (Phase 3).
+
+## Subscription management
+
+- **Subscriptions tab:** monthly total, active and paused counts, search, All, Active
+  and Paused tabs, category filters, and sorting by next renewal, name or price
+  (compared in your display currency).
+- **Add:** search the catalog or browse popular services, filter by category, or
+  create a custom subscription. Picking a service fills in its name, logo, category
+  and brand colour. You enter the amount, currency, billing cycle (weekly, monthly,
+  quarterly, yearly or a custom interval) and the next renewal date, plus an
+  optional reminder preference, plan, website and notes.
+- **Details:** original price and currency, converted monthly and yearly estimates,
+  schedule, category, reminder and notes, with edit, pause or resume, and delete
+  (with confirmation).
+- **Storage:** data is stored on the device in a small local database (sembast) and
+  survives restarts. Pausing stops future spending without rewriting past months.
+- **Sample data:** you can explore sample data from the empty state. It's kept
+  separate, never saved, and clearly labelled.
 
 ## Multi-currency
 

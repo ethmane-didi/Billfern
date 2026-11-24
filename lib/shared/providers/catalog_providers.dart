@@ -54,18 +54,26 @@ final catalogQueryProvider =
 
 /// Catalog results for the current [catalogQueryProvider] state. Empty
 /// queries return popular services (or a category's services).
+///
+/// Derived synchronously from the loaded catalog, so typing never flashes a
+/// loading state; it is only loading while the catalog asset first loads.
 final catalogSearchResultsProvider =
-    FutureProvider<List<SubscriptionCatalogItem>>((ref) async {
+    Provider<AsyncValue<List<SubscriptionCatalogItem>>>((ref) {
       final query = ref.watch(catalogQueryProvider);
-      final catalog = await ref.watch(subscriptionCatalogProvider.future);
-      return catalog.search(query.text, category: query.category);
+      return ref
+          .watch(subscriptionCatalogProvider)
+          .whenData(
+            (catalog) => catalog.search(query.text, category: query.category),
+          );
     });
 
 /// Popular services for the "browse" grid.
 final popularCatalogItemsProvider =
-    FutureProvider<List<SubscriptionCatalogItem>>((ref) async {
-      return (await ref.watch(subscriptionCatalogProvider.future)).popular;
-    });
+    Provider<AsyncValue<List<SubscriptionCatalogItem>>>(
+      (ref) => ref
+          .watch(subscriptionCatalogProvider)
+          .whenData((catalog) => catalog.popular),
+    );
 
 final subscriptionLogoResolverProvider = Provider<SubscriptionLogoResolver>(
   (ref) => const SubscriptionLogoResolver(),

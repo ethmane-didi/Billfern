@@ -77,11 +77,11 @@ final dueThisWeekProvider = Provider<Money>((ref) {
 /// Number of rows in the dashboard's "Recently added" list.
 const int recentlyAddedCount = 4;
 
-/// Most recently started subscriptions, newest first.
+/// Most recently added subscriptions, newest first.
 final recentlyAddedSubscriptionsProvider = Provider<List<Subscription>>((ref) {
   final subs = [...ref.watch(subscriptionsProvider)]
     ..sort((a, b) {
-      final byDate = b.startedOn.compareTo(a.startedOn);
+      final byDate = b.addedOn.compareTo(a.addedOn);
       return byDate != 0 ? byDate : a.name.compareTo(b.name);
     });
   return List.unmodifiable(subs.take(recentlyAddedCount));

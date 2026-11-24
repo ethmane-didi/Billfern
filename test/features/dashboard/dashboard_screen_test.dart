@@ -1,5 +1,6 @@
 import 'package:billfern/app.dart';
 import 'package:billfern/features/dashboard/presentation/widgets/ai_insight_card.dart';
+import 'package:billfern/features/subscriptions/presentation/screens/add_subscription_screen.dart';
 import 'package:billfern/features/dashboard/presentation/widgets/category_breakdown_card.dart';
 import 'package:billfern/features/dashboard/presentation/widgets/recently_added_section.dart';
 import 'package:billfern/features/dashboard/presentation/widgets/spending_trend_card.dart';
@@ -165,12 +166,12 @@ void main() {
     expect(find.text(r'$15.49'), findsOneWidget);
   });
 
-  testWidgets('add subscription shows a coming-soon message', (tester) async {
+  testWidgets('add subscription opens the catalog picker', (tester) async {
     await _pumpDashboard(tester);
 
     await tester.tap(find.bySemanticsLabel('Add subscription'));
-    await tester.pump();
-    expect(find.text('Adding subscriptions is coming soon.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(AddSubscriptionScreen), findsOneWidget);
   });
 
   testWidgets('view all on renewals opens the Subscriptions tab', (

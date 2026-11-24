@@ -61,6 +61,19 @@ class Money implements Comparable<Money> {
   Money divideRounded(int divisor) =>
       Money((minorUnits / divisor).round(), currencyCode);
 
+  /// Multiplies by `numerator / denominator` exactly, then rounds half away
+  /// from zero to whole minor units (e.g. weekly → monthly: × 52 / 12).
+  Money scaleRounded(int numerator, int denominator) {
+    assert(denominator > 0);
+    final product = BigInt.from(minorUnits) * BigInt.from(numerator);
+    final d = BigInt.from(denominator);
+    final rounded = (product.abs() * BigInt.two + d) ~/ (d * BigInt.two);
+    return Money(
+      (product.isNegative ? -rounded : rounded).toInt(),
+      currencyCode,
+    );
+  }
+
   /// Sums [amounts], which must all be in [currencyCode].
   static Money sum(Iterable<Money> amounts, String currencyCode) =>
       amounts.fold(Money.zero(currencyCode), (total, amount) => total + amount);

@@ -129,7 +129,9 @@ class _RenewalCard extends StatelessWidget {
               Expanded(
                 child: Align(
                   alignment: Alignment.topRight,
-                  child: _PlanTag(label: sub.plan),
+                  child: _PlanTag(
+                    label: sub.plan.isEmpty ? sub.billingCycle.label : sub.plan,
+                  ),
                 ),
               ),
             ],

@@ -127,6 +127,10 @@ Future<String?> showCurrencyPicker(
   BuildContext context, {
   required String selectedCode,
   String? suggestedCode,
+  String title = 'Display currency',
+  String description =
+      'Totals are converted into this currency. Each subscription keeps its '
+      'original currency.',
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -147,17 +151,10 @@ Future<String?> showCurrencyPicker(
             Semantics(
               container: true,
               header: true,
-              child: Text(
-                'Display currency',
-                style: AppTypography.sectionTitle,
-              ),
+              child: Text(title, style: AppTypography.sectionTitle),
             ),
             const SizedBox(height: AppSpacing.xxs),
-            Text(
-              'Totals are converted into this currency. Each subscription '
-              'keeps its original currency.',
-              style: AppTypography.bodySmall,
-            ),
+            Text(description, style: AppTypography.bodySmall),
             const SizedBox(height: AppSpacing.sm),
             CurrencyOptionList(
               selectedCode: selectedCode,

@@ -209,15 +209,16 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
+    await container.read(subscriptionCatalogProvider.future);
     container.read(catalogQueryProvider.notifier).setText('spot');
-    final results = await container.read(catalogSearchResultsProvider.future);
+    final results = container.read(catalogSearchResultsProvider).requireValue;
     expect(results.first.id, 'spotify');
 
     container
         .read(catalogQueryProvider.notifier)
         .setCategory(SubscriptionCategory.gaming);
     container.read(catalogQueryProvider.notifier).setText('');
-    final gaming = await container.read(catalogSearchResultsProvider.future);
+    final gaming = container.read(catalogSearchResultsProvider).requireValue;
     expect(gaming, isNotEmpty);
     expect(
       gaming.every((i) => i.category == SubscriptionCategory.gaming),

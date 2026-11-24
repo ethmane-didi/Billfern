@@ -81,7 +81,7 @@ class _SubscriptionRow extends StatelessWidget {
         '${CurrencyFormatter.format(sub.price)}/$cycle'
         '${converted == null ? '' : ' (≈ ${CurrencyFormatter.format(converted)})'}';
     final detail = sub.isActive
-        ? 'Added ${DateLabels.shortDate(sub.startedOn)} · $price'
+        ? 'Added ${DateLabels.shortDate(sub.addedOn)} · $price'
         : 'Paused · $price';
 
     return AppCard(
@@ -101,7 +101,7 @@ class _SubscriptionRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${sub.name} · ${sub.plan}',
+                  sub.plan.isEmpty ? sub.name : '${sub.name} · ${sub.plan}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.titleSmall,

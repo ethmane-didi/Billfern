@@ -17,17 +17,21 @@ premium plans.
 
 ### Current phase
 
-Frontend only, with realistic mock data. **Do not integrate** Supabase,
-authentication, OpenAI, RevenueCat, payments or banking APIs until asked.
+Frontend only, with data stored locally on the device. **Do not integrate** Supabase,
+authentication, OpenAI, RevenueCat, payments, banking or exchange-rate APIs until asked.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 — Design foundation | Tokens, theme, router, shared components | ✅ Done |
-| 2 — Dashboard | Greeting, spending summary, comparison, chart, categories, renewals, subscription cards, AI insight preview, add action | ✅ Done (awaiting review) |
-| 3 — Navigation | Home / Subscriptions / Analytics / Settings with placeholders | ✅ Shell and placeholders done |
+| 2 — Dashboard | Greeting, spending summary, comparison, chart, categories, renewals, subscription cards, AI insight preview, add action | ✅ Done |
+| 2.1 — Catalog and logos | 82-service catalog, 59 Simple Icons logos, `SubscriptionLogo` | ✅ Done |
+| 2.2 — Multi-currency | `Money`, conversion, display-currency preference | ✅ Done |
+| 3 — Subscription management | Subscriptions list, add (catalog or custom), details, edit, pause/resume, delete, local persistence | ✅ Done (awaiting review) |
+| Later | Analytics screen, reminder notifications, Supabase sync, real exchange rates | ⏳ |
 
-Home is the Phase 2 dashboard (`DashboardScreen`). Add, notifications, insight and card
-taps show a "coming soon" snackbar (`showComingSoon`) until those flows exist.
+Home is the dashboard (`DashboardScreen`). "+" opens the add flow, and renewal cards and
+recent rows open subscription details. Notifications and the smart tip still show a
+"coming soon" snackbar (`showComingSoon`). Analytics is a placeholder.
 
 **Design reference:** `docs/design/dashboard-reference.png` is the primary visual guide
 (dashboard, subscriptions list and analytics screens). Match its layout, proportions,
@@ -43,6 +47,7 @@ weights and chart styling, using Billfern's tokens and brand.
 | Icons | `lucide_icons_flutter`: **not** `lucide_icons`, which does not compile on Flutter ≥ 3.4x because `IconData` is now final |
 | Charts | `fl_chart` |
 | Formatting | `intl` |
+| Local storage | `sembast` (pure-Dart document DB: subscriptions) and `shared_preferences` (small settings), plus `path_provider` |
 | Future work | `supabase_flutter`, `flutter_local_notifications` (installed, not wired yet) |
 
 Identifiers: Dart package `billfern` (`package:billfern/…` imports), bundle ID / application ID
@@ -98,17 +103,65 @@ docs/design/dashboard-reference.png  # visual reference
 
 ### State
 
-Riverpod for shared state. Keep ephemeral UI state (press, animation) in
-`StatefulWidget`s. Mock data flows through providers/repositories so Supabase can be
-swapped in without touching widgets.
+Riverpod for shared state. Keep ephemeral UI state (press, animation, form fields) in
+`StatefulWidget`s. Data flows through repositories, so Supabase can be swapped in
+without touching widgets.
 
 **Data flow (single source of truth):**
 
 ```
-clockProvider → todayProvider → subscriptionRepositoryProvider (MockSubscriptionRepository)
-  → subscriptionsProvider (de-duplicated by id) ─┐
-preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─┴→ dashboard providers → widgets
+dataModeProvider ─┬─ personal → personalSubscriptionRepositoryProvider (sembast, overridden in main)
+                  └─ sample   → sampleSubscriptionRepositoryProvider (in-memory demo data)
+  → subscriptionRepositoryProvider → subscriptionsProvider (SubscriptionsNotifier) ─┐
+preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ──────────┴→ dashboard / list / details providers → widgets
 ```
+
+### Subscriptions and persistence
+
+- **`subscriptionsProvider`** is a `NotifierProvider` (`SubscriptionsNotifier`) with
+  `add`, `update`, `pause`, `resume` and `delete`. Every screen (dashboard, list,
+  details, and analytics later) derives from it, so any change updates everything at
+  once. Always mutate through the notifier.
+- **`SubscriptionRepository`**: `fetchAll()` is a synchronous in-memory snapshot,
+  while `save` and `delete` are async and write through. The repository is
+  replaceable:
+  - `SembastSubscriptionRepository`: one record per subscription, keyed by id, in
+    the `subscriptions` store of `<documents>/billfern.db`. It loads once in
+    `main`, and corrupt records are skipped and counted.
+  - `InMemorySubscriptionRepository`: tests and defaults.
+  - `DemoSubscriptionRepository`: sample data.
+  - For Supabase, either keep this load-then-cache shape or move the notifier to an
+    `AsyncNotifier`.
+- **`SubscriptionCodec`**: a versioned map format (`schema: 1`). Money is stored as
+  integer `priceMinor` plus `currencyCode`, and dates as ISO calendar dates.
+- **Sample vs personal data** (`DataMode`, persisted under `data_mode`):
+  - A fresh install starts in **personal** mode, empty, and shows "Start tracking"
+    or "No subscriptions yet" states with "Explore sample data".
+  - Sample mode reads an in-memory demo repository. Changes are discarded on
+    restart, and a `SampleDataBanner` is always shown.
+  - **Adding** a subscription in sample mode switches to personal mode first, so
+    demo records are never written to the database.
+- **`Subscription` equality is by value** (all fields). Riverpod only notifies when
+  `==` changes, so id-only equality would hide edits. Use `id` for identity.
+- **History-safe dates:**
+  - `startedOn` is when spending starts counting. For new subscriptions it's the day
+    they were added, so the history chart isn't invented.
+  - `billingAnchor` is a known billing date that renewals are computed from. Edits
+    move only this.
+  - `pausedOn` and `pauseHistory` (`PausePeriod`s): `isBilledInMonth` counts a month
+    when the subscription had started and wasn't paused on the month's last day. So
+    pausing removes it from the current month and projections, past months stay, and
+    paused months stay excluded after resuming.
+- **`BillingCycle`** is a value type (`count` and `BillingUnit` day, week, month or
+  year):
+  - Presets are `weekly`, `monthly`, `quarterly` and `yearly`, plus
+    `BillingCycle.custom(n, unit)`.
+  - Cost equivalents use exact fractions (52 weeks or 365 days a year) with one
+    rounding step (`Money.scaleRounded`).
+- **`ReminderPreference`** is stored per subscription. Notification scheduling comes
+  in a later phase.
+- **IDs** come from `subscriptionIdGeneratorProvider` (time plus random). Tests
+  override it for stable IDs.
 
 - **Money is `Money`**: integer minor units plus an ISO currency code. Never use
   `double` amounts or bare ints for money. Format only with `CurrencyFormatter.format(money)`.
@@ -130,8 +183,8 @@ preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─
 - AI insights come from `MockSavingsInsightEngine` (local rules, no network) behind
   `savingsInsightEngineProvider`. The UI presents them as a "Smart tip" tagged
   *Sample data*, never as real AI analysis. Swap the provider to integrate OpenAI later.
-- The repository is synchronous for now. With Supabase, `subscriptionsProvider`
-  becomes an `AsyncNotifier` and the derived providers propagate `AsyncValue`.
+- Sample data (`buildMockSubscriptions`) is only ever served by
+  `DemoSubscriptionRepository`; see Subscriptions and persistence.
 
 ### Multi-currency
 
@@ -199,10 +252,31 @@ preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─
   exact, then prefix, word prefix, alias and substring. Empty queries return popular
   services. Providers: `catalogQueryProvider` (Notifier: text and category),
   `catalogSearchResultsProvider`, `popularCatalogItemsProvider`.
-- **Add flow (Phase 3):** `SubscriptionDraft` (`features/subscriptions/domain/`).
-  `fromCatalog(item)` pre-fills name, category and catalog link. The user supplies
-  amount, currency, cycle and next renewal. `custom()` also accepts a website domain,
-  colour and `SubscriptionGlyph`.
+- **Add and edit flow** (`features/subscriptions/`):
+  - **Screens:** `AddSubscriptionScreen` (search, popular grid, category pills,
+    "Create custom subscription") leads to `SubscriptionFormScreen` (`.catalog`,
+    `.custom` or `.edit`), then to `SubscriptionDetailsScreen`.
+  - **Routes:** `/subscriptions/add`, `/subscriptions/add/custom`,
+    `/subscriptions/add/service/:catalogId`, `/subscriptions/:id` and
+    `/subscriptions/:id/edit`. Add and edit open on the **root navigator**, above the
+    floating nav, while details stay in the tab. Use the `AppRoutes` helpers.
+  - **`SubscriptionDraft`** holds the form state:
+    - `fromCatalog(item, currencyCode:)` pre-fills name, category and catalog link
+      (and so the logo and brand colour).
+    - The currency starts as the display currency and can be overridden.
+    - `validate(today:)` returns `DraftField` errors: name required (≤ 60),
+      amount > 0, renewal today or later, valid website domain, notes ≤ 500.
+    - `toSubscription(existing:)` keeps identity, status and history when editing.
+  - **`MoneyParser`** parses typed amounts into exact minor units. It accepts `.`
+    or `,` decimals, grouping and currency precision. A three-digit tail is
+    treated as grouping, and the form shows a live formatted preview so mistakes
+    are visible.
+  - **List:** `SubscriptionListQuery` (`features/subscriptions/domain/`) is pure
+    search, filter and sort logic. Price sorting uses the converted monthly
+    equivalent, with unconvertible subscriptions last.
+- `catalogSearchResultsProvider` is **synchronous** over the loaded catalog
+  (`AsyncValue` only while the asset first loads), so typing never flashes a
+  loading state.
 
 ### Logos
 
@@ -293,6 +367,12 @@ Add a new token instead. Changing `color` or `fontSize` is fine.
 | `TrendBadge` | Spending-change pill (decrease is mint/good, increase is coral/bad), with an `onDark` mode |
 | `PressableScale` | Shared tap affordance: press-scale and selection haptic, used instead of ink ripples |
 | `PlaceholderView` | "Coming soon" state for unfinished destinations |
+| `EmptyStateCard` | Empty or no-results card: icon tile, title, message, action buttons |
+| `ScreenHeader` / `CircleIconButton` | Title row with a circular back button and trailing action |
+| `SearchField` | Pill search input with clear button |
+| `ChoicePill` / `ChoicePillRow` | Selectable filter or option pills (selected = midnight). The label truncates rather than overflowing |
+| `showConfirmationSheet()` | Bottom-sheet confirmation (destructive variant for delete) |
+| `SampleDataBanner` | Visible whenever sample data is shown, with "Exit" |
 | `FadeSlideIn` | Subtle staggered entrance (fade and 16 px rise). Respects reduced motion |
 | `showComingSoon()` | Snackbar for actions whose flow isn't built yet |
 
@@ -345,6 +425,18 @@ flutter test
 ```
 
 - `test/flutter_test_config.dart` disables Google Fonts runtime fetching so tests stay hermetic.
+- `test/helpers/app_harness.dart`: `pumpBillfern(seed:, mode:, size:, textScale:)` pumps
+  the whole app with an in-memory personal repository (returned for assertions). It
+  also provides `openTab`, `tapVisible` (scrolls lazy lists and centres targets away
+  from the floating nav), `enterField`, `scrollToTop`, `tapBack` and `pickDay`.
+- `test/helpers/fixed_clock.dart`: `emptyAppTestOverrides` (first launch) and
+  `appTestOverrides` (sample data).
+- Subscription management tests: `subscription_management_flow_test.dart` (end to end:
+  add from catalog and custom, validation, edit, pause/resume, delete confirmation,
+  dashboard updates, overflow sweep), `subscription_persistence_test.dart` (real
+  sembast file DB across "restarts"), `subscriptions_notifier_test.dart`,
+  `subscription_list_query_test.dart`, `billing_cycle_test.dart` and
+  `money_parser_test.dart`.
 - `test/helpers/pump_themed.dart` provides `tester.pumpThemed(widget)`.
 - Add a widget test for each new shared component, and a smoke test for each new screen.
 - `test/features/dashboard/dashboard_screen_test.dart` includes a **layout overflow

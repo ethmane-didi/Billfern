@@ -70,8 +70,8 @@ void main() {
       );
     });
 
-    test('is one full cycle after a start date of today', () {
-      expect(_sub(startedOn: today).nextRenewal(today), DateTime(2026, 12, 24));
+    test('a billing anchor of today renews today', () {
+      expect(_sub(startedOn: today).nextRenewal(today), today);
     });
 
     test('keeps the original day after short months', () {
@@ -112,5 +112,49 @@ void main() {
     expect(sub.isBilledInMonth(DateTime(2026, 8)), isTrue);
     expect(sub.isBilledInMonth(DateTime(2026, 10)), isTrue);
     expect(sub.isBilledInMonth(DateTime(2026, 11)), isFalse);
+  });
+
+  group('pause and resume', () {
+    final sub = _sub(startedOn: DateTime(2026, 1, 15));
+
+    test('pausing excludes this month but keeps earlier months', () {
+      final paused = sub.pause(DateTime(2026, 11, 10));
+      expect(paused.isActive, isFalse);
+      expect(paused.pausedOn, DateTime(2026, 11, 10));
+      expect(paused.nextRenewal(DateTime(2026, 11, 24)), isNull);
+      expect(paused.isBilledInMonth(DateTime(2026, 10)), isTrue);
+      expect(paused.isBilledInMonth(DateTime(2026, 11)), isFalse);
+    });
+
+    test('resuming records the pause and bills again', () {
+      final resumed = sub
+          .pause(DateTime(2026, 8, 20))
+          .resume(DateTime(2026, 10, 5));
+      expect(resumed.isActive, isTrue);
+      expect(resumed.pausedOn, isNull);
+      expect(resumed.pauseHistory, [
+        PausePeriod(from: DateTime(2026, 8, 20), until: DateTime(2026, 10, 5)),
+      ]);
+      expect(resumed.isBilledInMonth(DateTime(2026, 7)), isTrue);
+      expect(resumed.isBilledInMonth(DateTime(2026, 8)), isFalse);
+      expect(resumed.isBilledInMonth(DateTime(2026, 9)), isFalse);
+      expect(resumed.isBilledInMonth(DateTime(2026, 10)), isTrue);
+      expect(
+        resumed.nextRenewal(DateTime(2026, 11, 24)),
+        DateTime(2026, 12, 15),
+      );
+    });
+
+    test('pause and resume are idempotent', () {
+      final today = DateTime(2026, 11, 24);
+      expect(sub.resume(today), same(sub));
+      final paused = sub.pause(today);
+      expect(paused.pause(today), same(paused));
+    });
+
+    test('a same-day pause and resume leaves no history', () {
+      final today = DateTime(2026, 11, 24);
+      expect(sub.pause(today).resume(today).pauseHistory, isEmpty);
+    });
   });
 }

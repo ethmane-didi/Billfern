@@ -6,6 +6,9 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/settings/presentation/screens/currency_preference_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/subscriptions/presentation/screens/add_subscription_screen.dart';
+import '../../features/subscriptions/presentation/screens/subscription_details_screen.dart';
+import '../../features/subscriptions/presentation/screens/subscription_form_screen.dart';
 import '../../features/subscriptions/presentation/screens/subscriptions_screen.dart';
 import 'app_destination.dart';
 import 'app_shell.dart';
@@ -24,7 +27,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             AppShell(navigationShell: navigationShell),
         branches: [
           _branch(AppDestination.home, const DashboardScreen()),
-          _branch(AppDestination.subscriptions, const SubscriptionsScreen()),
+          _branch(
+            AppDestination.subscriptions,
+            const SubscriptionsScreen(),
+            routes: _subscriptionRoutes,
+          ),
           _branch(AppDestination.analytics, const AnalyticsScreen()),
           _branch(
             AppDestination.settings,
@@ -45,6 +52,46 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
+/// Add and edit flows open full-screen above the shell (root navigator) so
+/// the floating navigation never covers form actions; details stay inside
+/// the Subscriptions tab. `add` is declared before `:id` so it is not
+/// mistaken for an id.
+final List<RouteBase> _subscriptionRoutes = [
+  GoRoute(
+    path: 'add',
+    parentNavigatorKey: _rootNavigatorKey,
+    builder: (context, state) => const AddSubscriptionScreen(),
+    routes: [
+      GoRoute(
+        path: 'custom',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SubscriptionFormScreen.custom(),
+      ),
+      GoRoute(
+        path: 'service/:catalogId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SubscriptionFormScreen.catalog(
+          catalogId: state.pathParameters['catalogId']!,
+        ),
+      ),
+    ],
+  ),
+  GoRoute(
+    path: ':id',
+    builder: (context, state) =>
+        SubscriptionDetailsScreen(subscriptionId: state.pathParameters['id']!),
+    routes: [
+      GoRoute(
+        path: 'edit',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SubscriptionFormScreen.edit(
+          subscriptionId: state.pathParameters['id']!,
+        ),
+      ),
+    ],
+  ),
+];
+
 /// Paths of routes nested under the top-level destinations.
 abstract final class AppRoutes {
   static const String currencySegment = 'currency';
@@ -52,6 +99,22 @@ abstract final class AppRoutes {
 
   /// Currency preference screen, pushed inside the Settings tab.
   static const String currency = '/settings/$currencySegment';
+
+  /// Catalog picker of the add flow.
+  static const String addSubscription = '/subscriptions/add';
+
+  /// Form for a subscription that is not in the catalog.
+  static const String addCustomSubscription = '/subscriptions/add/custom';
+
+  /// Form pre-filled from catalog service [catalogId].
+  static String addCatalogSubscription(String catalogId) =>
+      '/subscriptions/add/service/${Uri.encodeComponent(catalogId)}';
+
+  static String subscriptionDetails(String id) =>
+      '/subscriptions/${Uri.encodeComponent(id)}';
+
+  static String editSubscription(String id) =>
+      '/subscriptions/${Uri.encodeComponent(id)}/edit';
 }
 
 StatefulShellBranch _branch(

@@ -16,15 +16,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/fixed_clock.dart';
 
-class _FixedRepository implements SubscriptionRepository {
-  const _FixedRepository(this.subscriptions);
-
-  final List<Subscription> subscriptions;
-
-  @override
-  List<Subscription> fetchAll() => subscriptions;
-}
-
 class _DuplicatingRepository implements SubscriptionRepository {
   const _DuplicatingRepository(this.inner);
 
@@ -32,6 +23,12 @@ class _DuplicatingRepository implements SubscriptionRepository {
 
   @override
   List<Subscription> fetchAll() => [...inner.fetchAll(), ...inner.fetchAll()];
+
+  @override
+  Future<void> save(Subscription subscription) => inner.save(subscription);
+
+  @override
+  Future<void> delete(String id) => inner.delete(id);
 }
 
 ProviderContainer _container([List<Override> overrides = const []]) {
@@ -75,7 +72,7 @@ void main() {
     final c = _container([
       subscriptionRepositoryProvider.overrideWith(
         (ref) => _DuplicatingRepository(
-          MockSubscriptionRepository(today: ref.watch(todayProvider)),
+          DemoSubscriptionRepository(today: ref.watch(todayProvider)),
         ),
       ),
     ]);
@@ -103,7 +100,7 @@ void main() {
     );
     final c = _container([
       subscriptionRepositoryProvider.overrideWithValue(
-        _FixedRepository([personal, business]),
+        InMemorySubscriptionRepository([personal, business]),
       ),
     ]);
     expect(c.read(subscriptionsProvider), hasLength(2));

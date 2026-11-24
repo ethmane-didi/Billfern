@@ -46,4 +46,10 @@ abstract final class AppSizes {
   static const double legendBarHeight = 34;
   static const double statChipIcon = 30;
   static const double insightTile = 52;
+
+  // Forms & lists
+  static const double inputHeight = 56;
+  static const double numberFieldWidth = 96;
+  static const double priceColumnMaxWidth = 132;
+  static const double detailLogo = 72;
 }

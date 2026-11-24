@@ -129,6 +129,65 @@ abstract final class AppTheme {
         borderRadius: AppRadius.mdAll,
         borderSide: BorderSide(color: AppColors.midnight),
       ),
+      errorBorder: const OutlineInputBorder(
+        borderRadius: AppRadius.mdAll,
+        borderSide: BorderSide(color: AppColors.dangerStrong),
+      ),
+      focusedErrorBorder: const OutlineInputBorder(
+        borderRadius: AppRadius.mdAll,
+        borderSide: BorderSide(color: AppColors.dangerStrong, width: 1.5),
+      ),
+      errorStyle: AppTypography.caption.copyWith(color: AppColors.dangerStrong),
+      errorMaxLines: 2,
+    ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: AppColors.transparent,
+      headerBackgroundColor: AppColors.midnight,
+      headerForegroundColor: AppColors.textOnDark,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.xlAll),
+      dayStyle: AppTypography.bodyMedium,
+      yearStyle: AppTypography.bodyMedium,
+      weekdayStyle: AppTypography.labelMedium.copyWith(
+        color: AppColors.textMuted,
+      ),
+      headerHeadlineStyle: AppTypography.headlineMedium.copyWith(
+        color: AppColors.textOnDark,
+      ),
+      headerHelpStyle: AppTypography.labelMedium.copyWith(
+        color: AppColors.textOnDarkMuted,
+      ),
+      dayForegroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.textOnDark
+            : (states.contains(WidgetState.disabled)
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary),
+      ),
+      dayBackgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.midnight
+            : AppColors.transparent,
+      ),
+      todayForegroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.textOnDark
+            : AppColors.textPrimary,
+      ),
+      todayBackgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.midnight
+            : AppColors.yellowSoft,
+      ),
+      todayBorder: const BorderSide(color: AppColors.yellow),
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: AppColors.textPrimary,
+        textStyle: AppTypography.labelLarge,
+      ),
+      confirmButtonStyle: TextButton.styleFrom(
+        foregroundColor: AppColors.textPrimary,
+        textStyle: AppTypography.labelLarge,
+      ),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.midnight,
