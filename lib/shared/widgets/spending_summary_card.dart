@@ -10,12 +10,16 @@ import 'trend_badge.dart';
 ///
 /// Shows the total in a bold split figure, the change versus the previous
 /// period, the active subscription count and a projected yearly total.
+///
+/// The card only displays figures; callers compute them (see
+/// `SpendingCalculator`) so every screen shows the same numbers.
 class SpendingSummaryCard extends StatelessWidget {
   const SpendingSummaryCard({
     super.key,
     required this.amount,
     required this.changePercent,
     required this.activeCount,
+    required this.projectedYearly,
     this.title = 'Monthly spending',
     this.comparisonLabel = 'vs last month',
     this.currencyCode = AppConstants.defaultCurrencyCode,
@@ -29,6 +33,10 @@ class SpendingSummaryCard extends StatelessWidget {
   final double changePercent;
 
   final int activeCount;
+
+  /// Twelve-month cost of the active subscriptions.
+  final double projectedYearly;
+
   final String title;
   final String comparisonLabel;
   final String currencyCode;
@@ -80,7 +88,7 @@ class SpendingSummaryCard extends StatelessWidget {
                     Expanded(
                       child: _Stat(
                         value: CurrencyFormatter.format(
-                          amount * 12,
+                          projectedYearly,
                           currencyCode: currencyCode,
                           decimalDigits: 0,
                         ),

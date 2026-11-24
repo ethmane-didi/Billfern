@@ -4,17 +4,18 @@ import 'app_colors.dart';
 
 /// Gradient tokens.
 abstract final class AppGradients {
-  /// Soft pastel screen background: lavender fading into warm cream.
+  /// Soft pastel screen background: warm cream at the top, lavender in the
+  /// middle, a hint of mint at the bottom.
   static const LinearGradient background = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [AppColors.lavender, Color(0xFFF0EDF1), AppColors.cream],
-    stops: [0, 0.5, 1],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [AppColors.cream, AppColors.lavender, AppColors.mintMist],
+    stops: [0, 0.55, 1],
   );
 
   /// Warm glow layered over [background] (top-right).
   static const RadialGradient glowYellow = RadialGradient(
-    colors: [Color(0x66FFDA69), Color(0x00FFDA69)],
+    colors: [Color(0x40FFDA69), Color(0x00FFDA69)],
   );
 
   /// Cool glow layered over [background] (left edge).
@@ -38,6 +39,14 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFFFFE592), AppColors.yellow],
+  );
+
+  /// Soft tinted card used for AI insights.
+  static const LinearGradient insight = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AppColors.yellowSoft, AppColors.surface, AppColors.mintSoft],
+    stops: [0, 0.55, 1],
   );
 
   static const LinearGradient mint = LinearGradient(

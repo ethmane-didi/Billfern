@@ -109,6 +109,31 @@ abstract final class AppTypography {
 
   static final TextStyle titleSmall = _manrope(15, FontWeight.w600);
 
+  /// Section headings ("Upcoming renewals"): large but not heavy.
+  static final TextStyle sectionTitle = _manrope(
+    20,
+    FontWeight.w600,
+    height: 1.25,
+    letterSpacing: -0.3,
+  );
+
+  /// Service names on renewal cards.
+  static final TextStyle cardTitle = _manrope(
+    18,
+    FontWeight.w600,
+    height: 1.25,
+    letterSpacing: -0.2,
+  );
+
+  /// Medium-weight figures such as legend percentages.
+  static final TextStyle statValue = _manrope(
+    22,
+    FontWeight.w600,
+    height: 1.15,
+    letterSpacing: -0.4,
+    fontFeatures: _tabularFigures,
+  );
+
   /// Heavy style for monograms and compact badges.
   static final TextStyle monogram = _manrope(
     16,
@@ -153,6 +178,14 @@ abstract final class AppTypography {
     FontWeight.w600,
     height: 1.25,
     letterSpacing: 0.1,
+  );
+
+  /// Tiny supporting text, e.g. stat-chip captions (AA on white).
+  static final TextStyle caption = _manrope(
+    11,
+    FontWeight.w500,
+    height: 1.25,
+    color: AppColors.textMuted,
   );
 
   /// Overlines and small caps-style labels.

@@ -12,7 +12,7 @@ const _items = [
 ];
 
 void main() {
-  testWidgets('shows only the selected label and reports taps', (tester) async {
+  testWidgets('draws icons only and reports taps', (tester) async {
     int? selected;
     await tester.pumpThemed(
       FloatingBottomNav(
@@ -22,8 +22,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Analytics'), findsNothing);
+    for (final item in _items) {
+      expect(find.byIcon(item.icon), findsOneWidget);
+      expect(find.text(item.label), findsNothing);
+    }
 
     await tester.tap(find.byIcon(LucideIcons.chartPie));
     await tester.pumpAndSettle();

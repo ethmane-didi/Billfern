@@ -1,105 +1,105 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_destination.dart';
 import '../../../../core/theme/theme.dart';
-import '../../../../shared/widgets/buttons/primary_button.dart';
-import '../../../../shared/widgets/buttons/secondary_button.dart';
+import '../../../../shared/widgets/coming_soon.dart';
+import '../../../../shared/widgets/fade_slide_in.dart';
 import '../../../../shared/widgets/section_header.dart';
-import '../../../../shared/widgets/spending_summary_card.dart';
-import '../widgets/preview_renewal_tile.dart';
+import '../widgets/ai_insight_card.dart';
+import '../widgets/category_breakdown_card.dart';
+import '../widgets/dashboard_header.dart';
+import '../widgets/recently_added_section.dart';
+import '../widgets/spending_overview.dart';
+import '../widgets/spending_trend_card.dart';
+import '../widgets/upcoming_renewals_section.dart';
 
-/// Home destination.
-///
-/// Phase 1: showcases the shared design-system components so they can be
-/// reviewed on device. Replaced by the full dashboard in Phase 2.
+/// Home destination: spending overview, renewals, insights and analytics.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
-
-  static const List<PreviewRenewal> _previewRenewals = [
-    PreviewRenewal(
-      name: 'Netflix',
-      plan: 'Standard',
-      amount: 15.49,
-      dueLabel: 'Renews tomorrow',
-      brandColor: Color(0xFFE50914),
-      foregroundColor: AppColors.textOnDark,
-    ),
-    PreviewRenewal(
-      name: 'Spotify',
-      plan: 'Premium Individual',
-      amount: 11.99,
-      dueLabel: 'Renews in 3 days',
-      brandColor: Color(0xFF1ED760),
-      foregroundColor: AppColors.textPrimary,
-    ),
-    PreviewRenewal(
-      name: 'ChatGPT',
-      plan: 'Plus',
-      amount: 20.00,
-      dueLabel: 'Renews in 6 days',
-      brandColor: AppColors.lavender,
-      foregroundColor: AppColors.textPrimary,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
+    void goTo(AppDestination destination) => context.go(destination.path);
+    void comingSoon(String message) => showComingSoon(context, message);
+
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          AppSpacing.screenHorizontal,
-          AppSpacing.md,
-          AppSpacing.screenHorizontal,
-          bottomInset + AppSpacing.xl,
-        ),
-        children: [
-          Text(AppConstants.appName, style: AppTypography.headlineLarge),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(AppConstants.tagline, style: AppTypography.bodySmall),
-          const SizedBox(height: AppSpacing.xl),
-          const SpendingSummaryCard(
-            amount: 248.97,
-            changePercent: -8.2,
-            activeCount: 12,
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-          const SectionHeader(
-            title: 'Upcoming renewals',
-            subtitle: 'Design system preview',
-          ),
-          const SizedBox(height: AppSpacing.md),
-          for (final renewal in _previewRenewals) ...[
-            PreviewRenewalTile(renewal: renewal),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Centre content on wide screens; keep the standard inset on phones.
+          final inset = math.max(
+            AppSpacing.screenHorizontal,
+            (constraints.maxWidth - AppSizes.contentMaxWidth) / 2,
+          );
+          final horizontal = EdgeInsets.symmetric(horizontal: inset);
+          Widget padded(Widget child) =>
+              Padding(padding: horizontal, child: child);
+
+          final sections = <Widget>[
+            padded(
+              DashboardHeader(
+                onAddSubscription: () =>
+                    comingSoon('Adding subscriptions is coming soon.'),
+                onNotifications: () =>
+                    comingSoon('Renewal reminders are coming soon.'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            padded(const SpendingOverview()),
+            const SizedBox(height: AppSpacing.xxl),
+            UpcomingRenewalsSection(
+              padding: horizontal,
+              onViewAll: () => goTo(AppDestination.subscriptions),
+              onRenewalTap: (renewal) => comingSoon(
+                '${renewal.subscription.name} details are coming soon.',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            padded(const CategoryBreakdownCard()),
+            const SizedBox(height: AppSpacing.md),
+            padded(
+              AiInsightCard(
+                onTap: () =>
+                    comingSoon('Personalised savings tips are coming soon.'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            padded(
+              SectionHeader(
+                title: 'Spending trend',
+                actionLabel: 'Analytics',
+                onAction: () => goTo(AppDestination.analytics),
+              ),
+            ),
             const SizedBox(height: AppSpacing.sm),
-          ],
-          const SizedBox(height: AppSpacing.xl),
-          PrimaryButton(
-            label: 'Add subscription',
-            icon: LucideIcons.plus,
-            onPressed: () => _showComingSoon(context),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SecondaryButton(
-            label: 'View analytics',
-            icon: LucideIcons.chartPie,
-            onPressed: () => context.go(AppDestination.analytics.path),
-          ),
-        ],
+            padded(const SpendingTrendCard()),
+            const SizedBox(height: AppSpacing.xxl),
+            padded(
+              RecentlyAddedSection(
+                onViewAll: () => goTo(AppDestination.subscriptions),
+                onSubscriptionTap: (sub) =>
+                    comingSoon('${sub.name} details are coming soon.'),
+              ),
+            ),
+          ];
+
+          return ListView(
+            padding: EdgeInsets.only(
+              top: AppSpacing.xs,
+              bottom: bottomInset + AppSpacing.xl,
+            ),
+            children: [
+              for (var i = 0; i < sections.length; i++)
+                FadeSlideIn(index: i ~/ 3, child: sections[i]),
+            ],
+          );
+        },
       ),
     );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Adding subscriptions arrives soon.')),
-      );
   }
 }

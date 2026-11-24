@@ -16,6 +16,25 @@ abstract final class CurrencyFormatter {
     ).format(amount);
   }
 
+  /// Converts integer minor units (cents) to a major-unit amount.
+  ///
+  /// Billfern stores money as integer cents so sums never accumulate
+  /// floating-point error; convert only at the presentation boundary.
+  static double fromCents(int cents) => cents / 100;
+
+  /// Formats integer minor units, e.g. `24897` → `$248.97`.
+  static String formatCents(
+    int cents, {
+    String currencyCode = AppConstants.defaultCurrencyCode,
+    int decimalDigits = 2,
+  }) {
+    return format(
+      fromCents(cents),
+      currencyCode: currencyCode,
+      decimalDigits: decimalDigits,
+    );
+  }
+
   /// Splits a formatted amount into its whole and fractional parts so they
   /// can be styled independently, e.g. `$248` and `.97`.
   static ({String whole, String fraction}) split(

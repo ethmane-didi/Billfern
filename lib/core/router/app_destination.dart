@@ -12,7 +12,11 @@ enum AppDestination {
     label: 'Subscriptions',
     icon: LucideIcons.layoutGrid,
   ),
-  analytics(path: '/analytics', label: 'Analytics', icon: LucideIcons.chartPie),
+  analytics(
+    path: '/analytics',
+    label: 'Analytics',
+    icon: LucideIcons.chartNoAxesColumn,
+  ),
   settings(path: '/settings', label: 'Settings', icon: LucideIcons.settings);
 
   const AppDestination({

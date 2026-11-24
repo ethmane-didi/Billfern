@@ -37,8 +37,9 @@ class SectionHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Semantics(
+                  container: true,
                   header: true,
-                  child: Text(title, style: AppTypography.titleMedium),
+                  child: Text(title, style: AppTypography.sectionTitle),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: AppSpacing.xxs),
@@ -64,6 +65,7 @@ class _SectionAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       button: true,
       label: label,
       excludeSemantics: true,

@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/widgets.dart';
 
 import '../../core/theme/theme.dart';
@@ -11,14 +9,17 @@ class FloatingNavItem {
   const FloatingNavItem({required this.icon, required this.label});
 
   final IconData icon;
+
+  /// Read by screen readers; not drawn.
   final String label;
 }
 
-/// Floating, pill-shaped midnight navigation bar.
+/// Compact floating white pill with icon-only destinations.
 ///
-/// The selected destination expands into a yellow pill showing its label;
-/// the others collapse to icons. The bar handles its own safe-area inset, so
-/// place it directly in `Scaffold.bottomNavigationBar` with `extendBody`.
+/// The selected destination is a filled midnight circle with a white icon.
+/// Labels are exposed through semantics (with the selected state) rather than
+/// drawn. The bar handles its own safe-area inset, so place it directly in
+/// `Scaffold.bottomNavigationBar` with `extendBody`.
 class FloatingBottomNav extends StatelessWidget {
   const FloatingBottomNav({
     super.key,
@@ -32,7 +33,8 @@ class FloatingBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelected;
 
-  static const EdgeInsets _barPadding = EdgeInsets.all(AppSpacing.xs);
+  static const double _barPadding =
+      (AppSizes.navBarHeight - AppSizes.navItemSize) / 2;
 
   @override
   Widget build(BuildContext context) {
@@ -40,58 +42,38 @@ class FloatingBottomNav extends StatelessWidget {
       top: false,
       minimum: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.xs,
-          AppSpacing.xl,
-          AppSpacing.xs,
-        ),
+        padding: const EdgeInsets.only(top: AppSpacing.xs),
         child: Center(
           heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSizes.navBarMaxWidth,
+          child: Container(
+            height: AppSizes.navBarHeight,
+            padding: const EdgeInsets.all(_barPadding),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.pillAll,
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.floating,
             ),
-            child: Container(
-              height: AppSizes.navBarHeight,
-              padding: _barPadding,
-              decoration: const BoxDecoration(
-                color: AppColors.midnight,
-                borderRadius: AppRadius.pillAll,
-                boxShadow: AppShadows.floating,
-              ),
-              child: Semantics(
-                container: true,
-                explicitChildNodes: true,
-                child: LayoutBuilder(builder: _buildItems),
+            child: Semantics(
+              container: true,
+              explicitChildNodes: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var index = 0; index < items.length; index++) ...[
+                    if (index > 0) const SizedBox(width: AppSizes.navItemGap),
+                    _NavItem(
+                      item: items[index],
+                      isSelected: index == currentIndex,
+                      onTap: () => onSelected(index),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildItems(BuildContext context, BoxConstraints constraints) {
-    const collapsedWidth = AppSizes.navItemSize;
-    final availableForSelected =
-        constraints.maxWidth - collapsedWidth * (items.length - 1);
-    final selectedWidth = math.max(
-      collapsedWidth,
-      math.min(availableForSelected, AppSizes.navSelectedMaxWidth),
-    );
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        for (var index = 0; index < items.length; index++)
-          _NavItem(
-            item: items[index],
-            isSelected: index == currentIndex,
-            width: index == currentIndex ? selectedWidth : collapsedWidth,
-            onTap: () => onSelected(index),
-          ),
-      ],
     );
   }
 }
@@ -100,22 +82,17 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.item,
     required this.isSelected,
-    required this.width,
     required this.onTap,
   });
 
   final FloatingNavItem item;
   final bool isSelected;
-  final double width;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final foreground = isSelected
-        ? AppColors.textOnAccent
-        : AppColors.navInactive;
-
     return Semantics(
+      container: true,
       button: true,
       selected: isSelected,
       label: item.label,
@@ -125,33 +102,17 @@ class _NavItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: AppMotion.medium,
           curve: AppMotion.emphasized,
-          width: width,
+          width: AppSizes.navItemSize,
           height: AppSizes.navItemSize,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.yellow : AppColors.transparent,
-            borderRadius: AppRadius.pillAll,
+            color: isSelected ? AppColors.midnight : AppColors.transparent,
+            shape: BoxShape.circle,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(item.icon, size: AppSizes.iconMd, color: foreground),
-              if (isSelected)
-                Flexible(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: AppSpacing.xs),
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: AppTypography.labelMedium.copyWith(
-                        color: foreground,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          child: Icon(
+            item.icon,
+            size: AppSizes.iconMd,
+            color: isSelected ? AppColors.textOnDark : AppColors.textPrimary,
           ),
         ),
       ),

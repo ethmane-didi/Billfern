@@ -43,6 +43,7 @@ class PlaceholderView extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Semantics(
+                  container: true,
                   header: true,
                   child: Text(
                     title,

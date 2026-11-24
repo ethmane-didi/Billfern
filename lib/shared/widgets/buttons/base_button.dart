@@ -54,6 +54,7 @@ class BaseButton extends StatelessWidget {
             .copyWith(color: foregroundColor);
 
     return Semantics(
+      container: true,
       button: true,
       enabled: _isEnabled,
       label: label,

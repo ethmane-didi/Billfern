@@ -10,6 +10,7 @@ void main() {
         amount: 248.97,
         changePercent: -8.2,
         activeCount: 12,
+        projectedYearly: 2987.64,
       ),
     );
 

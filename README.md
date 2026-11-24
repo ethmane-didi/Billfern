@@ -6,8 +6,41 @@ Billfern is a premium, AI-powered subscription tracker and personal finance app 
 iOS and Android. It helps people manage recurring payments, see upcoming renewals,
 find subscriptions they no longer need, and save money.
 
-> **Status:** early development. The design system, shared components and navigation
-> shell are in place, and the dashboard is next. All data is mocked; there is no backend yet.
+> **Status:** early development. The design system, navigation shell and home dashboard
+> are in place. All data is mocked, and AI insights are local sample rules. There is no backend yet.
+
+## Dashboard
+
+The home screen shows:
+
+- A personalised greeting and a notifications button
+- Monthly spending, the change versus last month, the number of active subscriptions
+  and a projected yearly total
+- Upcoming renewals for the next 30 days
+- An AI savings insight preview, using mock data
+- A six-month spending trend and a breakdown by category
+- Subscription cards and an "Add subscription" action
+
+Every figure is derived from one subscription list (`subscriptionsProvider`) by
+`SpendingCalculator`. Amounts are stored as integer cents, so totals always agree
+across cards.
+
+The visual reference is [`docs/design/dashboard-reference.png`](docs/design/dashboard-reference.png).
+
+## Subscription catalog and logos
+
+- **Catalog:** 82 popular services across entertainment, music, AI, design,
+  productivity, cloud storage, development, gaming, fitness, education, security and
+  Nordic services, in `assets/data/subscription_catalog.json`. It stores identity,
+  category, brand colour, aliases and the logo path, never prices.
+- **Logos:** 59 brand logos are bundled as offline SVGs in `assets/logos/`, from
+  [Simple Icons](https://simpleicons.org/) (CC0). Services without a permitted logo
+  show coloured initials. Sources and brand guidelines are listed in
+  [`docs/brand-logos.md`](docs/brand-logos.md).
+- **Regenerating:** run `python3 tool/catalog/build_catalog.py <extracted simple-icons package>`.
+  That script is the single source of truth for the catalog.
+
+Users will be able to search the catalog or add custom subscriptions (Phase 3).
 
 ## Features (roadmap)
 
@@ -47,8 +80,9 @@ lib/
 │   └── onboarding/ authentication/            # each: data / domain / presentation as needed
 ├── shared/
 │   ├── widgets/     # Reusable UI components
-│   ├── models/      # Shared models
-│   └── providers/   # App-wide Riverpod providers
+│   ├── models/      # Subscription, catalog item, branding, billing cycle, category, user
+│   ├── data/        # Repositories (subscriptions, catalog), catalog search, logo resolver
+│   └── providers/   # Clock, subscriptions, catalog/search/branding, current user
 ├── app.dart         # Root widget (theme + router)
 └── main.dart        # Entry point
 ```

@@ -7,7 +7,8 @@ import 'pressable_scale.dart';
 /// Billfern content.
 ///
 /// Pass [gradient] for tinted or dark hero cards. When [onTap] is provided the
-/// card becomes a pressable button and [semanticLabel] describes it.
+/// card becomes a pressable button; [semanticLabel], when set, replaces the
+/// semantics of its contents.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -52,8 +53,10 @@ class AppCard extends StatelessWidget {
     if (onTap == null) return card;
 
     return Semantics(
+      container: true,
       button: true,
       label: semanticLabel,
+      excludeSemantics: semanticLabel != null,
       child: PressableScale(onPressed: onTap, child: card),
     );
   }

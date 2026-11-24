@@ -36,12 +36,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(
-          of: find.byType(FloatingBottomNav),
-          matching: find.text(destination.label),
+        tester.getSemantics(
+          find.descendant(
+            of: find.byType(FloatingBottomNav),
+            matching: find.bySemanticsLabel(destination.label),
+          ),
         ),
-        findsOneWidget,
-        reason: 'selected tab shows its label',
+        isSemantics(isButton: true, isSelected: true),
+        reason: 'selected tab reports its selected state',
       );
       expect(
         find.widgetWithText(PlaceholderView, destination.label),
