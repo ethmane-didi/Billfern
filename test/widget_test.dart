@@ -1,30 +1,57 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:billfern/app.dart';
+import 'package:billfern/core/router/app_destination.dart';
+import 'package:billfern/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:billfern/shared/widgets/floating_bottom_nav.dart';
+import 'package:billfern/shared/widgets/placeholder_view.dart';
 
-import 'package:billfern/main.dart';
+Finder _navIcon(AppDestination destination) => find.descendant(
+  of: find.byType(FloatingBottomNav),
+  matching: find.byIcon(destination.icon),
+);
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('boots into Home with the floating navigation', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: BillfernApp()));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.byType(DashboardScreen), findsOneWidget);
+    expect(find.byType(FloatingBottomNav), findsOneWidget);
+    for (final destination in AppDestination.values) {
+      expect(_navIcon(destination), findsOneWidget);
+    }
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('navigates between all destinations', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: BillfernApp()));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    for (final destination in [
+      AppDestination.subscriptions,
+      AppDestination.analytics,
+      AppDestination.settings,
+    ]) {
+      await tester.tap(_navIcon(destination));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(FloatingBottomNav),
+          matching: find.text(destination.label),
+        ),
+        findsOneWidget,
+        reason: 'selected tab shows its label',
+      );
+      expect(
+        find.widgetWithText(PlaceholderView, destination.label),
+        findsOneWidget,
+        reason: 'destination screen is shown',
+      );
+    }
+
+    await tester.tap(_navIcon(AppDestination.home));
+    await tester.pumpAndSettle();
+    expect(find.text('Upcoming renewals'), findsOneWidget);
   });
 }

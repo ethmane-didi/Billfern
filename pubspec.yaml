@@ -42,8 +42,7 @@ dependencies:
   flutter_local_notifications: ^23.0.4
   intl: ^0.20.3
   flutter_svg: ^2.5.0
-  lucide_icons: ^0.257.0
-
+  lucide_icons_flutter: ^4.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
