@@ -1,7 +1,6 @@
 import 'package:flutter/painting.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/date_math.dart';
 import '../../../shared/models/billing_cycle.dart';
 import '../../../shared/models/subscription.dart';
@@ -13,7 +12,9 @@ import '../../../shared/models/subscription_glyph.dart';
 ///
 /// Picking a catalog service ([SubscriptionDraft.fromCatalog]) fills in the
 /// name, category and branding, so the user only enters the amount, currency,
-/// billing cycle and next renewal date. A custom draft
+/// billing cycle and next renewal date. The currency starts as the user's
+/// preferred currency but is the subscription's own: it is stored with the
+/// price and never converted. A custom draft
 /// ([SubscriptionDraft.custom]) also accepts an optional website, colour and
 /// icon.
 @immutable
@@ -21,10 +22,10 @@ class SubscriptionDraft {
   const SubscriptionDraft({
     required this.name,
     required this.category,
+    required this.currencyCode,
     this.catalogId,
     this.plan = '',
-    this.amountCents,
-    this.currencyCode = AppConstants.defaultCurrencyCode,
+    this.amountMinor,
     this.billingCycle = BillingCycle.monthly,
     this.nextRenewal,
     this.websiteDomain,
@@ -32,23 +33,33 @@ class SubscriptionDraft {
     this.customGlyph,
   });
 
-  factory SubscriptionDraft.fromCatalog(SubscriptionCatalogItem item) =>
-      SubscriptionDraft(
-        name: item.name,
-        category: item.category,
-        catalogId: item.id,
-      );
+  factory SubscriptionDraft.fromCatalog(
+    SubscriptionCatalogItem item, {
+    required String currencyCode,
+  }) => SubscriptionDraft(
+    name: item.name,
+    category: item.category,
+    catalogId: item.id,
+    currencyCode: currencyCode,
+  );
 
   factory SubscriptionDraft.custom({
+    required String currencyCode,
     String name = '',
     SubscriptionCategory category = SubscriptionCategory.productivity,
-  }) => SubscriptionDraft(name: name, category: category);
+  }) => SubscriptionDraft(
+    name: name,
+    category: category,
+    currencyCode: currencyCode,
+  );
 
   final String name;
   final SubscriptionCategory category;
   final String? catalogId;
   final String plan;
-  final int? amountCents;
+
+  /// Price in minor units of [currencyCode].
+  final int? amountMinor;
   final String currencyCode;
   final BillingCycle billingCycle;
   final DateTime? nextRenewal;
@@ -61,15 +72,15 @@ class SubscriptionDraft {
   /// Whether every field the user must provide is filled in.
   bool get isComplete =>
       name.trim().isNotEmpty &&
-      amountCents != null &&
-      amountCents! >= 0 &&
+      amountMinor != null &&
+      amountMinor! >= 0 &&
       nextRenewal != null;
 
   SubscriptionDraft copyWith({
     String? name,
     SubscriptionCategory? category,
     String? plan,
-    int? amountCents,
+    int? amountMinor,
     String? currencyCode,
     BillingCycle? billingCycle,
     DateTime? nextRenewal,
@@ -82,7 +93,7 @@ class SubscriptionDraft {
       category: category ?? this.category,
       catalogId: catalogId,
       plan: plan ?? this.plan,
-      amountCents: amountCents ?? this.amountCents,
+      amountMinor: amountMinor ?? this.amountMinor,
       currencyCode: currencyCode ?? this.currencyCode,
       billingCycle: billingCycle ?? this.billingCycle,
       nextRenewal: nextRenewal ?? this.nextRenewal,
@@ -107,7 +118,7 @@ class SubscriptionDraft {
       id: id,
       name: name.trim(),
       plan: plan.trim().isEmpty ? billingCycle.label : plan.trim(),
-      priceCents: amountCents!,
+      priceMinor: amountMinor!,
       billingCycle: billingCycle,
       category: category,
       startedOn: DateMath.addMonths(renewal, -billingCycle.months),

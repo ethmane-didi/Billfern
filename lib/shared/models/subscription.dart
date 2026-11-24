@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../core/constants/app_constants.dart';
+import '../../core/money/money.dart';
 import '../../core/utils/date_math.dart';
 import 'billing_cycle.dart';
 import 'subscription_category.dart';
@@ -19,7 +19,9 @@ enum SubscriptionStatus {
 
 /// A recurring payment the user tracks.
 ///
-/// Money is stored in integer minor units ([priceCents]). Identity is the
+/// The price is stored in integer minor units ([priceMinor]) of the
+/// subscription's own [currencyCode]; it never changes when the user switches
+/// display currency. Identity is the
 /// [id]: two instances with the same id are the same subscription. Several
 /// subscriptions may share a [catalogId] (e.g. personal and business Notion
 /// accounts).
@@ -33,18 +35,18 @@ class Subscription {
     required this.id,
     required this.name,
     required this.plan,
-    required this.priceCents,
+    required this.priceMinor,
+    required this.currencyCode,
     required this.billingCycle,
     required this.category,
     required this.startedOn,
     this.catalogId,
-    this.currencyCode = AppConstants.defaultCurrencyCode,
     this.websiteDomain,
     this.customColor,
     this.customGlyph,
     this.status = SubscriptionStatus.active,
     this.pausedOn,
-  }) : assert(priceCents >= 0, 'Price cannot be negative.'),
+  }) : assert(priceMinor >= 0, 'Price cannot be negative.'),
        assert(
          (status == SubscriptionStatus.paused) == (pausedOn != null),
          'pausedOn is required for, and only for, paused subscriptions.',
@@ -55,7 +57,7 @@ class Subscription {
   final String plan;
 
   /// Price charged every [billingCycle], in cents.
-  final int priceCents;
+  final int priceMinor;
 
   final BillingCycle billingCycle;
   final SubscriptionCategory category;
@@ -66,8 +68,7 @@ class Subscription {
   /// Catalog service this subscription is for, or `null` for a custom one.
   final String? catalogId;
 
-  /// ISO 4217 currency of [priceCents]. Totals currently assume one currency;
-  /// conversion arrives with multi-currency support.
+  /// ISO 4217 code of [priceMinor] — the currency the user is charged in.
   final String currencyCode;
 
   /// Optional website of a custom subscription, e.g. `example.com`. Used by
@@ -87,11 +88,14 @@ class Subscription {
 
   bool get isActive => status == SubscriptionStatus.active;
 
-  /// Equivalent monthly cost, in cents.
-  int get monthlyCostCents => billingCycle.monthlyCents(priceCents);
+  /// Price per [billingCycle], in [currencyCode].
+  Money get price => Money(priceMinor, currencyCode);
 
-  /// Cost over twelve months, in cents.
-  int get annualCostCents => billingCycle.annualCents(priceCents);
+  /// Equivalent monthly cost, in [currencyCode].
+  Money get monthlyCost => billingCycle.monthlyCost(price);
+
+  /// Cost over twelve months, in [currencyCode].
+  Money get annualCost => billingCycle.annualCost(price);
 
   /// Whether this subscription contributed to spending in the calendar month
   /// starting at [monthStart]: it had started before the month ended and was
@@ -130,5 +134,6 @@ class Subscription {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'Subscription($id, $name, $priceCents¢/$billingCycle)';
+  String toString() =>
+      'Subscription($id, $name, $priceMinor $currencyCode/$billingCycle)';
 }

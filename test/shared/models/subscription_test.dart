@@ -1,3 +1,4 @@
+import 'package:billfern/core/money/money.dart';
 import 'package:billfern/shared/models/billing_cycle.dart';
 import 'package:billfern/shared/models/subscription.dart';
 import 'package:billfern/shared/models/subscription_category.dart';
@@ -13,7 +14,8 @@ Subscription _sub({
     id: 'test',
     name: 'Test',
     plan: 'Plan',
-    priceCents: priceCents,
+    priceMinor: priceCents,
+    currencyCode: 'USD',
     billingCycle: cycle,
     category: SubscriptionCategory.productivity,
     startedOn: startedOn,
@@ -32,12 +34,15 @@ void main() {
         cycle: BillingCycle.yearly,
         startedOn: DateTime(2026),
       );
-      expect(sub.monthlyCostCents, 999);
-      expect(sub.annualCostCents, 11988);
+      expect(sub.monthlyCost, const Money(999, 'USD'));
+      expect(sub.annualCost, const Money(11988, 'USD'));
     });
 
     test('monthly plans annualise by twelve', () {
-      expect(_sub(startedOn: DateTime(2026)).annualCostCents, 12000);
+      expect(
+        _sub(startedOn: DateTime(2026)).annualCost,
+        const Money(12000, 'USD'),
+      );
     });
   });
 

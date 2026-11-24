@@ -107,7 +107,8 @@ class _RenewalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sub = renewal.subscription;
-    final amount = CurrencyFormatter.formatCents(renewal.amountCents);
+    // Each card keeps the subscription's original currency.
+    final amount = CurrencyFormatter.format(renewal.amount);
     final due = DateLabels.relativeDays(renewal.daysUntil);
     final date = DateLabels.shortDate(renewal.date);
     final isSoon = renewal.daysUntil <= dueSoonDays;

@@ -4,7 +4,10 @@ import 'package:billfern/app.dart';
 import 'package:billfern/core/router/app_destination.dart';
 import 'package:billfern/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:billfern/shared/widgets/floating_bottom_nav.dart';
+import 'package:billfern/features/settings/presentation/screens/settings_screen.dart';
 import 'package:billfern/shared/widgets/placeholder_view.dart';
+
+import 'helpers/fixed_clock.dart';
 
 Finder _navIcon(AppDestination destination) => find.descendant(
   of: find.byType(FloatingBottomNav),
@@ -13,7 +16,9 @@ Finder _navIcon(AppDestination destination) => find.descendant(
 
 void main() {
   testWidgets('boots into Home with the floating navigation', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: BillfernApp()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: appTestOverrides, child: const BillfernApp()),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(DashboardScreen), findsOneWidget);
@@ -24,7 +29,9 @@ void main() {
   });
 
   testWidgets('navigates between all destinations', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: BillfernApp()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: appTestOverrides, child: const BillfernApp()),
+    );
     await tester.pumpAndSettle();
 
     for (final destination in [
@@ -46,7 +53,9 @@ void main() {
         reason: 'selected tab reports its selected state',
       );
       expect(
-        find.widgetWithText(PlaceholderView, destination.label),
+        destination == AppDestination.settings
+            ? find.byType(SettingsScreen)
+            : find.widgetWithText(PlaceholderView, destination.label),
         findsOneWidget,
         reason: 'destination screen is shown',
       );

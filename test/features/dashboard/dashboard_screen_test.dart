@@ -39,7 +39,7 @@ Future<void> _pumpDashboard(
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
   await tester.pumpWidget(
-    ProviderScope(overrides: fixedClockOverrides, child: const BillfernApp()),
+    ProviderScope(overrides: appTestOverrides, child: const BillfernApp()),
   );
   // Let the catalog (a real asset read) finish loading before settling.
   final container = ProviderScope.containerOf(
@@ -76,13 +76,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Good morning, Alex'), findsOneWidget);
-    expect(find.text(r'$123.42'), findsWidgets);
+    // Mixed USD/EUR/NOK subscriptions converted to USD at mock rates.
+    expect(find.text(r'≈ $164.35'), findsOneWidget);
     expect(
-      find.text(r'Total monthly spending · $1,481 a year'),
+      find.text(r'Total monthly spending · ≈ $1,972 a year'),
       findsOneWidget,
     );
-    expect(find.text('11 active'), findsOneWidget);
-    expect(find.text('−7.5%'), findsOneWidget);
+    expect(find.text('Estimate · mock exchange rates'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Display currency, US Dollar. Change'),
+      findsOneWidget,
+    );
+    expect(find.text('13 active'), findsOneWidget);
+    expect(find.text('−5.7%'), findsOneWidget);
     expect(find.text(r'$36.48'), findsOneWidget);
     expect(find.text('Upcoming renewals'), findsOneWidget);
 
@@ -100,9 +106,16 @@ void main() {
       find.textContaining(r'$9.99 less than last month', findRichText: true),
       findsOneWidget,
     );
+    // Hero, donut centre and trend card show the same total.
+    expect(find.text(r'$164.35'), findsWidgets);
 
     await _scrollToEnd(tester);
-    expect(find.text('11 active · 1 paused'), findsOneWidget);
+    expect(find.text('13 active · 1 paused'), findsOneWidget);
+    // Rows keep the original currency, with a converted hint.
+    expect(
+      find.textContaining('229.00/mo', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.text('Strava · Premium'), findsOneWidget);
   });
 
@@ -127,6 +140,29 @@ void main() {
     // ChatGPT has no permitted bundled logo, so it falls back to initials.
     await _scrollToEnd(tester);
     expect(find.text('C'), findsWidgets);
+  });
+
+  testWidgets('changing the display currency converts the dashboard', (
+    tester,
+  ) async {
+    await _pumpDashboard(tester);
+
+    await tester.tap(
+      find.bySemanticsLabel('Display currency, US Dollar. Change'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Display currency'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Norwegian Krone, NOK'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.bySemanticsLabel('Display currency, Norwegian Krone. Change'),
+      findsOneWidget,
+    );
+    expect(find.text('≈ kr\u00A01,775.01'), findsOneWidget);
+    // Renewal cards keep their own currencies.
+    expect(find.text(r'$15.49'), findsOneWidget);
   });
 
   testWidgets('add subscription shows a coming-soon message', (tester) async {

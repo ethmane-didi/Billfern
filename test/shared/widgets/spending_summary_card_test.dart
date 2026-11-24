@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:billfern/core/money/money.dart';
 import 'package:billfern/shared/widgets/spending_summary_card.dart';
 
 import '../../helpers/pump_themed.dart';
@@ -7,10 +8,10 @@ void main() {
   testWidgets('renders amount, trend and stats', (tester) async {
     await tester.pumpThemed(
       const SpendingSummaryCard(
-        amount: 248.97,
+        amount: Money(24897, 'USD'),
         changePercent: -8.2,
         activeCount: 12,
-        projectedYearly: 2987.64,
+        projectedYearly: Money(298764, 'USD'),
       ),
     );
 

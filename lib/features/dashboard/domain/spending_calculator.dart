@@ -1,26 +1,68 @@
+import '../../../core/money/currency_converter.dart';
+import '../../../core/money/money.dart';
 import '../../../core/utils/date_math.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/models/subscription_category.dart';
 import 'dashboard_models.dart';
 
-/// Pure spending calculations. Every figure on the dashboard is derived here
-/// from the same subscription list, so the hero total, chart, categories and
-/// renewals always agree.
+/// Pure spending calculations. Every dashboard figure is derived here from
+/// the same subscription list and the same [MoneyConverter], so the hero
+/// total, chart, categories, renewals and insights always agree.
+///
+/// Amounts are converted **per subscription** into the display currency and
+/// then summed; amounts in different currencies are never added directly.
+/// Subscriptions whose currency has no rate are excluded and reported.
 abstract final class SpendingCalculator {
-  /// Sum of monthly-equivalent costs of the subscriptions billed in the month
+  /// Converts and sums [amountOf] for each subscription.
+  static ConvertedTotal convertedSum(
+    Iterable<Subscription> subs,
+    Money Function(Subscription) amountOf,
+    MoneyConverter converter,
+  ) {
+    var total = Money.zero(converter.targetCurrency);
+    final missing = <String>{};
+    var excluded = 0;
+    var converted = false;
+    for (final sub in subs) {
+      final original = amountOf(sub);
+      final value = converter.convert(original);
+      if (value == null) {
+        missing.add(original.currencyCode);
+        excluded++;
+        continue;
+      }
+      if (original.currencyCode != converter.targetCurrency) converted = true;
+      total += value;
+    }
+    return ConvertedTotal(
+      total: total,
+      missingCurrencies: missing,
+      excludedCount: excluded,
+      isConverted: converted,
+    );
+  }
+
+  /// Monthly-equivalent spending of the subscriptions billed in the month
   /// starting at [month].
-  static int totalForMonth(Iterable<Subscription> subs, DateTime month) {
+  static ConvertedTotal totalForMonth(
+    Iterable<Subscription> subs,
+    DateTime month,
+    MoneyConverter converter,
+  ) {
     final monthStart = DateMath.monthStart(month);
-    return subs
-        .where((sub) => sub.isBilledInMonth(monthStart))
-        .fold(0, (sum, sub) => sum + sub.monthlyCostCents);
+    return convertedSum(
+      subs.where((sub) => sub.isBilledInMonth(monthStart)),
+      (sub) => sub.monthlyCost,
+      converter,
+    );
   }
 
   /// Monthly totals for the [months] calendar months ending with the month
   /// containing [today], oldest first.
   static List<MonthlySpend> monthlyHistory(
     Iterable<Subscription> subs,
-    DateTime today, {
+    DateTime today,
+    MoneyConverter converter, {
     int months = 6,
   }) {
     assert(months > 0);
@@ -31,7 +73,7 @@ abstract final class SpendingCalculator {
           final month = DateMath.addMonths(current, -offset);
           return MonthlySpend(
             month: month,
-            totalCents: totalForMonth(subs, month),
+            total: totalForMonth(subs, month, converter).total,
             isCurrent: offset == 0,
           );
         }(),
@@ -39,21 +81,32 @@ abstract final class SpendingCalculator {
   }
 
   /// Headline figures for the month containing [today].
-  static SpendingSummary summary(Iterable<Subscription> subs, DateTime today) {
+  static SpendingSummary summary(
+    Iterable<Subscription> subs,
+    DateTime today,
+    MoneyConverter converter,
+  ) {
     final active = subs.where((sub) => sub.isActive).toList();
     final current = DateMath.monthStart(today);
+    final thisMonth = totalForMonth(subs, current, converter);
+    final lastMonth = totalForMonth(
+      subs,
+      DateMath.addMonths(current, -1),
+      converter,
+    );
+    final yearly = convertedSum(active, (sub) => sub.annualCost, converter);
     return SpendingSummary(
-      monthlyTotalCents: totalForMonth(subs, current),
-      previousMonthTotalCents: totalForMonth(
-        subs,
-        DateMath.addMonths(current, -1),
-      ),
-      projectedYearlyCents: active.fold(
-        0,
-        (sum, sub) => sum + sub.annualCostCents,
-      ),
+      monthlyTotal: thisMonth.total,
+      previousMonthTotal: lastMonth.total,
+      projectedYearly: yearly.total,
       activeCount: active.length,
       pausedCount: subs.length - active.length,
+      isEstimate: thisMonth.isConverted || yearly.isConverted,
+      excludedCount: thisMonth.excludedCount,
+      missingCurrencies: {
+        ...thisMonth.missingCurrencies,
+        ...yearly.missingCurrencies,
+      },
     );
   }
 
@@ -62,18 +115,19 @@ abstract final class SpendingCalculator {
   /// When there are more than [maxSlices] categories, the smallest are merged
   /// into a single "Other" slice so the chart stays legible.
   static List<CategorySpend> categoryBreakdown(
-    Iterable<Subscription> subs, {
+    Iterable<Subscription> subs,
+    MoneyConverter converter, {
     int maxSlices = 5,
   }) {
     assert(maxSlices >= 2);
-    final totals = <SubscriptionCategory, int>{};
+    final target = converter.targetCurrency;
+    final totals = <SubscriptionCategory, Money>{};
     final counts = <SubscriptionCategory, int>{};
     for (final sub in subs.where((sub) => sub.isActive)) {
-      totals.update(
-        sub.category,
-        (value) => value + sub.monthlyCostCents,
-        ifAbsent: () => sub.monthlyCostCents,
-      );
+      final monthly = converter.convert(sub.monthlyCost);
+      if (monthly == null) continue;
+      totals[sub.category] =
+          (totals[sub.category] ?? Money.zero(target)) + monthly;
       counts.update(sub.category, (value) => value + 1, ifAbsent: () => 1);
     }
 
@@ -83,27 +137,28 @@ abstract final class SpendingCalculator {
         return byAmount != 0 ? byAmount : a.key.index.compareTo(b.key.index);
       });
 
-    final slices = <({SubscriptionCategory? category, int cents, int count})>[
-      for (final entry in sorted.take(
-        sorted.length > maxSlices ? maxSlices - 1 : sorted.length,
-      ))
-        (category: entry.key, cents: entry.value, count: counts[entry.key]!),
+    final keep = sorted.length > maxSlices ? maxSlices - 1 : sorted.length;
+    final slices = <({SubscriptionCategory? category, Money total, int count})>[
+      for (final entry in sorted.take(keep))
+        (category: entry.key, total: entry.value, count: counts[entry.key]!),
     ];
     if (sorted.length > maxSlices) {
-      final rest = sorted.skip(maxSlices - 1);
+      final rest = sorted.skip(keep);
       slices.add((
         category: null,
-        cents: rest.fold(0, (sum, entry) => sum + entry.value),
+        total: Money.sum(rest.map((entry) => entry.value), target),
         count: rest.fold(0, (sum, entry) => sum + counts[entry.key]!),
       ));
     }
 
-    final percents = wholePercentages([for (final s in slices) s.cents]);
+    final percents = wholePercentages([
+      for (final slice in slices) slice.total.minorUnits,
+    ]);
     return [
       for (var i = 0; i < slices.length; i++)
         CategorySpend(
           category: slices[i].category,
-          totalCents: slices[i].cents,
+          total: slices[i].total,
           percent: percents[i],
           subscriptionCount: slices[i].count,
         ),
@@ -113,7 +168,8 @@ abstract final class SpendingCalculator {
   /// Active renewals due within [withinDays] of [today], soonest first.
   static List<UpcomingRenewal> upcomingRenewals(
     Iterable<Subscription> subs,
-    DateTime today, {
+    DateTime today,
+    MoneyConverter converter, {
     int withinDays = 30,
   }) {
     final renewals = <UpcomingRenewal>[];
@@ -123,7 +179,12 @@ abstract final class SpendingCalculator {
       final daysUntil = DateMath.daysBetween(today, date);
       if (daysUntil <= withinDays) {
         renewals.add(
-          UpcomingRenewal(subscription: sub, date: date, daysUntil: daysUntil),
+          UpcomingRenewal(
+            subscription: sub,
+            date: date,
+            daysUntil: daysUntil,
+            convertedAmount: converter.convert(sub.price),
+          ),
         );
       }
     }

@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/money/money.dart';
 import '../../../../shared/models/subscription.dart';
 import '../../../../shared/providers/clock_provider.dart';
+import '../../../../shared/providers/currency_providers.dart';
 import '../../../../shared/providers/subscription_providers.dart';
 import '../../domain/dashboard_models.dart';
 import '../../domain/savings_insight_engine.dart';
@@ -26,6 +28,7 @@ final spendingSummaryProvider = Provider<SpendingSummary>((ref) {
   return SpendingCalculator.summary(
     ref.watch(subscriptionsProvider),
     ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
   );
 });
 
@@ -33,18 +36,23 @@ final spendingHistoryProvider = Provider<List<MonthlySpend>>((ref) {
   return SpendingCalculator.monthlyHistory(
     ref.watch(subscriptionsProvider),
     ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
     months: dashboardHistoryMonths,
   );
 });
 
 final categoryBreakdownProvider = Provider<List<CategorySpend>>((ref) {
-  return SpendingCalculator.categoryBreakdown(ref.watch(subscriptionsProvider));
+  return SpendingCalculator.categoryBreakdown(
+    ref.watch(subscriptionsProvider),
+    ref.watch(moneyConverterProvider),
+  );
 });
 
 final upcomingRenewalsProvider = Provider<List<UpcomingRenewal>>((ref) {
   return SpendingCalculator.upcomingRenewals(
     ref.watch(subscriptionsProvider),
     ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
   );
 });
 
@@ -56,12 +64,14 @@ final dueSoonRenewalsProvider = Provider<List<UpcomingRenewal>>((ref) {
   ];
 });
 
-/// Total charged by renewals in the next seven days, in cents.
-final dueThisWeekCentsProvider = Provider<int>((ref) {
-  return ref
-      .watch(upcomingRenewalsProvider)
-      .where((renewal) => renewal.daysUntil <= 7)
-      .fold(0, (sum, renewal) => sum + renewal.amountCents);
+/// Total charged by renewals in the next seven days, in the display
+/// currency. Renewals without an exchange rate are left out.
+final dueThisWeekProvider = Provider<Money>((ref) {
+  return Money.sum([
+    for (final renewal in ref.watch(upcomingRenewalsProvider))
+      if (renewal.daysUntil <= 7 && renewal.convertedAmount != null)
+        renewal.convertedAmount!,
+  ], ref.watch(preferredCurrencyProvider));
 });
 
 /// Number of rows in the dashboard's "Recently added" list.
@@ -85,5 +95,8 @@ final savingsInsightEngineProvider = Provider<SavingsInsightEngine>(
 final savingsInsightProvider = Provider<SavingsInsight?>((ref) {
   return ref
       .watch(savingsInsightEngineProvider)
-      .topInsight(ref.watch(subscriptionsProvider));
+      .topInsight(
+        ref.watch(subscriptionsProvider),
+        ref.watch(moneyConverterProvider),
+      );
 });

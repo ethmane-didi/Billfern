@@ -42,6 +42,25 @@ The visual reference is [`docs/design/dashboard-reference.png`](docs/design/dash
 
 Users will be able to search the catalog or add custom subscriptions (Phase 3).
 
+## Multi-currency
+
+Billfern is built for international users:
+
+- **Original currencies:** every subscription keeps the currency it is billed in.
+- **Display currency:** totals, charts and insights are converted into the user's
+  preferred currency. It's suggested from the device locale, can be changed from the
+  dashboard or **Settings → Display currency**, and is saved on the device.
+- **Supported:** USD, EUR, NOK, GBP, SEK, DKK, CHF, CAD and AUD. Other ISO 4217
+  currencies work through `intl`.
+- **Exact amounts:** money is stored as integer minor units in its own currency.
+  Conversion uses exact integer arithmetic with one rounding step, and amounts in
+  different currencies are never added directly.
+- **Rates:** exchange rates come from a replaceable provider. Development uses
+  deterministic **mock rates**, and converted totals are labelled as estimates. No
+  external exchange-rate API is connected yet.
+
+See [CLAUDE.md](CLAUDE.md#multi-currency) for the architecture.
+
 ## Features (roadmap)
 
 - Subscription management, with active and paused subscriptions
@@ -114,7 +133,7 @@ network connection the first time the app runs.
 ```bash
 dart format lib test
 flutter analyze
-flutter test
+flutter test --concurrency=2   # keeps memory use modest
 ```
 
 ## Configuration

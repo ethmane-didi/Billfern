@@ -61,7 +61,8 @@ lib/
 ├── main.dart                  # ProviderScope + runApp
 ├── app.dart                   # BillfernApp: MaterialApp.router + theme
 ├── core/
-│   ├── constants/             # AppConstants (name, tagline, default currency)
+│   ├── constants/             # AppConstants (name, tagline)
+│   ├── money/                 # Currency, Money, CurrencyConverter/MoneyConverter, ExchangeRates(+state), ExchangeRateRepository, LocaleCurrency
 │   ├── router/                # app_router.dart (Riverpod provider), app_shell.dart, app_destination.dart
 │   ├── theme/                 # design tokens + AppTheme; import via theme.dart barrel
 │   ├── utils/                 # CurrencyFormatter, DateMath, DateLabels
@@ -105,28 +106,81 @@ swapped in without touching widgets.
 
 ```
 clockProvider → todayProvider → subscriptionRepositoryProvider (MockSubscriptionRepository)
-  → subscriptionsProvider (de-duplicated by id) → dashboard providers → widgets
+  → subscriptionsProvider (de-duplicated by id) ─┐
+preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─┴→ dashboard providers → widgets
 ```
 
-- **Money is integer cents** (`priceCents`, `monthlyTotalCents`, …). Sum in cents and
-  convert only at the UI boundary with `CurrencyFormatter.formatCents` / `fromCents`.
+- **Money is `Money`**: integer minor units plus an ISO currency code. Never use
+  `double` amounts or bare ints for money. Format only with `CurrencyFormatter.format(money)`.
 - **No financial maths in widgets.** All totals, comparisons, category shares,
   history and renewals come from `SpendingCalculator`
   (`features/dashboard/domain/`), exposed through `dashboard_providers.dart`.
   Widgets such as `SpendingSummaryCard` only display values they're given.
-- Monthly spending = sum of `monthlyCostCents` of subscriptions billed that month
+- Monthly spending = sum of the converted `monthlyCost` of subscriptions billed that month
   (`Subscription.isBilledInMonth`: started before month end, not paused before it).
   So the hero total, the chart's current bar and the category slices always agree.
 - Category percentages use the largest-remainder method and always sum to 100. Beyond
   five categories the tail merges into "Other".
-- Yearly mock prices divide evenly by 12, so monthly × 12 equals the projected yearly figure.
-- Mock data is built relative to `today`. Tests pin the clock with
-  `test/helpers/fixed_clock.dart` (Tue 24 Nov 2026, 09:00).
+- Yearly mock prices divide evenly by 12. Projected yearly is the sum of converted
+  `annualCost` values, so with conversion it can differ from monthly × 12 by a few minor
+  units of rounding.
+- Mock data is built relative to `today`. Tests use `appTestOverrides` from
+  `test/helpers/fixed_clock.dart`: a fixed clock (Tue 24 Nov 2026, 09:00) and an
+  en_US device locale, so the display currency is USD.
 - AI insights come from `MockSavingsInsightEngine` (local rules, no network) behind
   `savingsInsightEngineProvider`. The UI presents them as a "Smart tip" tagged
   *Sample data*, never as real AI analysis. Swap the provider to integrate OpenAI later.
 - The repository is synchronous for now. With Supabase, `subscriptionsProvider`
   becomes an `AsyncNotifier` and the derived providers propagate `AsyncValue`.
+
+### Multi-currency
+
+- **Each subscription has its own currency** (`Subscription.currencyCode`, required) and
+  a price in that currency's minor units (`priceMinor`). Changing the display currency
+  never modifies prices.
+- **Supported currencies:** `Currency.supported` lists USD, EUR, NOK, GBP, SEK, DKK, CHF,
+  CAD and AUD, with curated symbols (`$ € kr £ kr kr CHF CA$ A$`). `Currency.of(code)`
+  derives any other ISO 4217 currency (symbol and decimal precision, e.g. JPY has 0)
+  from `intl`. To offer a new currency, add it to `supported`, and add a mock rate if
+  needed.
+- **`Money` never mixes currencies.** `+`, `-`, `compareTo` and `Money.sum` throw
+  `CurrencyMismatchError`. Rounding is half away from zero.
+- **Conversion** happens only in `CurrencyConverter.convert`. It uses exact `BigInt`
+  arithmetic on minor units, rates stored as integer millionths, and a single rounding
+  to the target precision. It returns `null` when a rate is missing.
+  `MoneyConverter` (from `moneyConverterProvider`) binds the target currency and the
+  current rate state.
+- **All aggregates** (hero, yearly projection, history chart, categories, due this week,
+  savings insight) go through `SpendingCalculator.convertedSum`, which converts each
+  subscription and then sums. Subscriptions without a rate are **excluded and
+  reported** (`excludedCount`, `missingCurrencies`), never mixed in. Totals with any
+  conversion carry `isEstimate`.
+- **Rates:** `ExchangeRateSource` (development uses `MockExchangeRateSource`:
+  deterministic units-per-USD, **development only**), `ExchangeRateCache` (in memory,
+  pre-filled with the mock snapshot in development) and `ExchangeRateRepository`
+  produce an `ExchangeRateState`: `RatesAvailable(rates, isStale)` (older than 24 h) or
+  `RatesUnavailable`. `exchangeRatesProvider.notifier.refresh()` fetches, and falls back
+  to the cache. There is no external API yet; plug one in by overriding
+  `exchangeRateSourceProvider` (plus a persistent cache).
+- **UI rules:** converted totals show "≈" and a `ConversionNote` ("Estimate · mock
+  exchange rates", stale or excluded warnings). Subscription cards and renewals show
+  the **original** currency. Recently added rows add an "(≈ converted)" hint.
+- **Preference:** `preferredCurrencyProvider` (Notifier) holds the saved choice, or else
+  the `suggestedCurrencyProvider` value derived from `deviceLocaleProvider` via
+  `LocaleCurrency` (region first, then language; euro-area countries map to EUR;
+  fallback USD). It's persisted by `CurrencyPreferenceStore`: `main` creates
+  `SharedPreferencesWithCache` and overrides the provider, and the default is in
+  memory, so tests stay hermetic. `select(code)` and `useSuggested()` change it.
+- **Components:** `CurrencySelector` (pill on the dashboard hero),
+  `showCurrencyPicker` (bottom sheet), `CurrencyOptionList` (shared with
+  `CurrencyPreferenceScreen` at `/settings/currency`, `AppRoutes.currency`), and
+  `ConversionNote`.
+- **Number locale:** `CurrencyFormatter.configure(deviceLocale)` runs in `main`, so
+  grouping, decimal separator and symbol position follow the device (e.g.
+  `199,00 kr` in nb_NO). Tests use `en_US`, and `CurrencyFormatter.reset()` restores
+  it. Alphabetic symbols get a non-breaking space ("kr 199.00").
+- **Mock data** mixes USD, EUR (Figma) and NOK (Viaplay, Storytel). With an en_US
+  device the dashboard shows ≈ $164.35/month.
 
 ### Subscription catalog (separate from user subscriptions)
 
@@ -233,7 +287,9 @@ Add a new token instead. Changing `color` or `fontSize` is fine.
 | `SectionHeader` | Title, optional subtitle and an optional "See all" action |
 | `FloatingBottomNav` | Compact white pill with icon-only tabs. Selected tab is a midnight circle. Labels are exposed via semantics. Handles its own safe area |
 | `SubscriptionLogo` | Brand logo in a circle or squircle tile (see Logos). `UserSubscriptionLogo` / `CatalogServiceLogo` resolve branding via providers |
-| `SpendingSummaryCard` | Dark hero card (no longer used on Home, kept for future screens): split amount, `TrendBadge`, active count, projected yearly |
+| `SpendingSummaryCard` | Dark hero card (no longer used on Home, kept for future screens): split `Money` amount, `TrendBadge`, active count, projected yearly |
+| `CurrencySelector` / `CurrencyOptionList` / `showCurrencyPicker` | Display-currency pill, list and bottom sheet (see Multi-currency) |
+| `ConversionNote` | Caption labelling converted totals as estimates, or warning about stale or missing rates |
 | `TrendBadge` | Spending-change pill (decrease is mint/good, increase is coral/bad), with an `onDark` mode |
 | `PressableScale` | Shared tap affordance: press-scale and selection haptic, used instead of ink ripples |
 | `PlaceholderView` | "Coming soon" state for unfinished destinations |
@@ -273,7 +329,8 @@ Layout notes:
   `*Screen` for route widgets.
 - Avoid deprecated APIs: use `withValues(alpha:)` not `withOpacity`, `*ThemeData`
   classes for component themes, and `isSemantics` in tests.
-- Format money only through `CurrencyFormatter`.
+- Represent money only as `Money`, convert only via `CurrencyConverter`/`MoneyConverter`,
+  and format only through `CurrencyFormatter`. Never hardcode currency symbols.
 - Never commit secrets or API keys. Future keys belong in `--dart-define` or env config, never in source.
 - Don't modify platform folders (`ios/`, `android/`, …) unless the task requires it.
 
@@ -298,6 +355,11 @@ flutter test
 - Catalog tests (`test/shared/data/`) check that every bundled logo path exists, the
   required services are present, there are no prices, and search ranking. Logo tests
   cover the resolution order and missing-asset fallbacks.
+- Currency tests: `test/core/money/money_test.dart` (Money, conversion, rounding,
+  rates, locale suggestions), `test/core/utils/currency_formatter_test.dart`,
+  `test/shared/providers/currency_preference_test.dart` (persistence), and provider
+  tests for mixed currencies, unavailable or stale rates and switching currency. Run
+  with `flutter test --concurrency=2` on 8 GB machines.
 - Widget tests that need the catalog must let the real asset read finish:
   `await tester.runAsync(() => container.read(subscriptionCatalogProvider.future))`.
 

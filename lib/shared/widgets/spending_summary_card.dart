@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_constants.dart';
+import '../../core/money/money.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import 'app_card.dart';
@@ -22,12 +22,11 @@ class SpendingSummaryCard extends StatelessWidget {
     required this.projectedYearly,
     this.title = 'Monthly spending',
     this.comparisonLabel = 'vs last month',
-    this.currencyCode = AppConstants.defaultCurrencyCode,
     this.onTap,
   });
 
   /// Total spend for the period.
-  final double amount;
+  final Money amount;
 
   /// Change versus the previous period, in percent. Negative = less spent.
   final double changePercent;
@@ -35,11 +34,10 @@ class SpendingSummaryCard extends StatelessWidget {
   final int activeCount;
 
   /// Twelve-month cost of the active subscriptions.
-  final double projectedYearly;
+  final Money projectedYearly;
 
   final String title;
   final String comparisonLabel;
-  final String currencyCode;
   final VoidCallback? onTap;
 
   @override
@@ -66,7 +64,7 @@ class SpendingSummaryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _SplitAmount(amount: amount, currencyCode: currencyCode),
+                _SplitAmount(amount: amount),
                 const SizedBox(height: AppSpacing.md),
                 TrendBadge(
                   changePercent: changePercent,
@@ -89,8 +87,7 @@ class SpendingSummaryCard extends StatelessWidget {
                       child: _Stat(
                         value: CurrencyFormatter.format(
                           projectedYearly,
-                          currencyCode: currencyCode,
-                          decimalDigits: 0,
+                          showDecimals: false,
                         ),
                         label: 'Projected yearly',
                       ),
@@ -107,17 +104,16 @@ class SpendingSummaryCard extends StatelessWidget {
 }
 
 class _SplitAmount extends StatelessWidget {
-  const _SplitAmount({required this.amount, required this.currencyCode});
+  const _SplitAmount({required this.amount});
 
-  final double amount;
-  final String currencyCode;
+  final Money amount;
 
   @override
   Widget build(BuildContext context) {
-    final parts = CurrencyFormatter.split(amount, currencyCode: currencyCode);
+    final parts = CurrencyFormatter.split(amount);
 
     return Semantics(
-      label: CurrencyFormatter.format(amount, currencyCode: currencyCode),
+      label: CurrencyFormatter.format(amount),
       excludeSemantics: true,
       child: FittedBox(
         fit: BoxFit.scaleDown,

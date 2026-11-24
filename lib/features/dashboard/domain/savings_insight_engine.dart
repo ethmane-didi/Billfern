@@ -1,12 +1,16 @@
-import '../../../core/utils/currency_formatter.dart';
+import '../../../core/money/currency_converter.dart';
+import '../../../core/money/money.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/models/subscription_category.dart';
 import 'dashboard_models.dart';
 
-/// Produces savings recommendations for the AI insight card.
+/// Produces savings recommendations for the smart tip card.
 abstract interface class SavingsInsightEngine {
   /// The single most valuable insight, or `null` when nothing stands out.
-  SavingsInsight? topInsight(List<Subscription> subscriptions);
+  SavingsInsight? topInsight(
+    List<Subscription> subscriptions,
+    MoneyConverter converter,
+  );
 }
 
 /// **Mock** insight engine: deterministic rules standing in for the future
@@ -14,45 +18,46 @@ abstract interface class SavingsInsightEngine {
 ///
 /// Rule: when the user pays for more than one service in an interchangeable
 /// category (e.g. two music services), suggest keeping the most expensive
-/// one and cancelling the others.
+/// one and cancelling the others. Costs are compared in the display
+/// currency, so services billed in different currencies rank correctly.
 class MockSavingsInsightEngine implements SavingsInsightEngine {
   const MockSavingsInsightEngine();
 
   @override
-  SavingsInsight? topInsight(List<Subscription> subscriptions) {
+  SavingsInsight? topInsight(
+    List<Subscription> subscriptions,
+    MoneyConverter converter,
+  ) {
     SavingsInsight? best;
     for (final category in SubscriptionCategory.values) {
       if (!category.isInterchangeable) continue;
-      final overlapping =
-          subscriptions
-              .where((sub) => sub.isActive && sub.category == category)
-              .toList()
-            ..sort((a, b) => b.annualCostCents.compareTo(a.annualCostCents));
-      if (overlapping.length < 2) continue;
 
-      final cancellable = overlapping.skip(1).toList();
-      final savings = cancellable.fold(
-        0,
-        (sum, sub) => sum + sub.annualCostCents,
+      final priced = <({Subscription sub, Money annual})>[];
+      for (final sub in subscriptions) {
+        if (!sub.isActive || sub.category != category) continue;
+        final annual = converter.convert(sub.annualCost);
+        if (annual != null) priced.add((sub: sub, annual: annual));
+      }
+      if (priced.length < 2) continue;
+      priced.sort((a, b) => b.annual.compareTo(a.annual));
+
+      final cancel = priced.skip(1).toList();
+      final savings = Money.sum(
+        cancel.map((entry) => entry.annual),
+        converter.targetCurrency,
       );
-      if (best != null && savings <= best.annualSavingsCents) continue;
+      if (best != null && savings.compareTo(best.annualSavings) <= 0) continue;
 
       best = SavingsInsight(
-        title: 'Overlapping ${category.label.toLowerCase()} services',
-        message:
-            'You pay for ${_joinNames(overlapping)}. Keeping just '
-            '${overlapping.first.name} could save you '
-            '${CurrencyFormatter.formatCents(savings)} a year.',
-        annualSavingsCents: savings,
-        subscriptions: overlapping,
+        category: category,
+        keep: priced.first.sub,
+        cancel: [for (final entry in cancel) entry.sub],
+        annualSavings: savings,
+        isEstimate: cancel.any(
+          (entry) => entry.sub.currencyCode != converter.targetCurrency,
+        ),
       );
     }
     return best;
-  }
-
-  static String _joinNames(List<Subscription> subs) {
-    final names = [for (final sub in subs) sub.name];
-    if (names.length == 2) return 'both ${names[0]} and ${names[1]}';
-    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
   }
 }

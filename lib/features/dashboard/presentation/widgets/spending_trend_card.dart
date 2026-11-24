@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/money/money.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_labels.dart';
@@ -21,7 +22,7 @@ class SpendingTrendCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(spendingSummaryProvider);
     final history = ref.watch(spendingHistoryProvider);
-    final total = CurrencyFormatter.formatCents(summary.monthlyTotalCents);
+    final total = CurrencyFormatter.format(summary.monthlyTotal);
 
     return AppCard(
       child: Column(
@@ -64,8 +65,8 @@ class SpendingTrendCard extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           _ChangeLine(
-            changeCents: summary.changeCents,
-            previousCents: summary.previousMonthTotalCents,
+            change: summary.change,
+            previous: summary.previousMonthTotal,
           ),
           const SizedBox(height: AppSpacing.lg),
           _SpendingLineChart(history: history),
@@ -76,16 +77,16 @@ class SpendingTrendCard extends ConsumerWidget {
 }
 
 class _ChangeLine extends StatelessWidget {
-  const _ChangeLine({required this.changeCents, required this.previousCents});
+  const _ChangeLine({required this.change, required this.previous});
 
-  final int changeCents;
-  final int previousCents;
+  final Money change;
+  final Money previous;
 
   @override
   Widget build(BuildContext context) {
-    final amount = CurrencyFormatter.formatCents(changeCents.abs());
-    final previous = CurrencyFormatter.formatCents(previousCents);
-    final (text, color) = switch (changeCents) {
+    final amount = CurrencyFormatter.format(change.abs());
+    final previousText = CurrencyFormatter.format(previous);
+    final (text, color) = switch (change.minorUnits) {
       < 0 => ('$amount less than last month', AppColors.successStrong),
       > 0 => ('$amount more than last month', AppColors.dangerStrong),
       _ => ('Same as last month', AppColors.textMuted),
@@ -97,7 +98,7 @@ class _ChangeLine extends StatelessWidget {
             text: text,
             style: AppTypography.labelMedium.copyWith(color: color),
           ),
-          TextSpan(text: '  ·  $previous', style: AppTypography.bodySmall),
+          TextSpan(text: '  ·  $previousText', style: AppTypography.bodySmall),
         ],
       ),
     );
@@ -115,7 +116,7 @@ class _SpendingLineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final values = [for (final s in history) s.totalCents.toDouble()];
+    final values = [for (final s in history) s.total.minorUnits.toDouble()];
     final maxValue = values.fold(0.0, math.max);
     final minValue = values.fold(maxValue, math.min);
     final maxY = maxValue == 0 ? 1.0 : maxValue * _headroom;
@@ -124,7 +125,7 @@ class _SpendingLineChart extends StatelessWidget {
     final description = history
         .map(
           (s) =>
-              '${DateLabels.month(s.month)} ${CurrencyFormatter.formatCents(s.totalCents)}',
+              '${DateLabels.month(s.month)} ${CurrencyFormatter.format(s.total)}',
         )
         .join(', ');
 
@@ -172,9 +173,7 @@ class _SpendingLineChart extends StatelessWidget {
                 getTooltipItems: (spots) => [
                   for (final spot in spots)
                     LineTooltipItem(
-                      CurrencyFormatter.formatCents(
-                        history[spot.x.toInt()].totalCents,
-                      ),
+                      CurrencyFormatter.format(history[spot.x.toInt()].total),
                       AppTypography.labelMedium.copyWith(
                         color: AppColors.textOnDark,
                       ),

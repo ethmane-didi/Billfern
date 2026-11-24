@@ -1,3 +1,5 @@
+import '../../core/money/money.dart';
+
 /// How often a subscription charges.
 enum BillingCycle {
   monthly(months: 1, shortLabel: 'mo', label: 'Monthly'),
@@ -17,9 +19,10 @@ enum BillingCycle {
 
   final String label;
 
-  /// Equivalent monthly cost of a [priceCents] charge, rounded to the cent.
-  int monthlyCents(int priceCents) => (priceCents / months).round();
+  /// Equivalent monthly cost of a [price] charge, rounded to the minor unit
+  /// in the same currency.
+  Money monthlyCost(Money price) => price.divideRounded(months);
 
-  /// Total cost over twelve months of a [priceCents] charge.
-  int annualCents(int priceCents) => priceCents * (12 ~/ months);
+  /// Total cost over twelve months of a [price] charge.
+  Money annualCost(Money price) => price * (12 ~/ months);
 }

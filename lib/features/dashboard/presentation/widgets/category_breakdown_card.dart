@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/money/money.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/widgets/app_card.dart';
@@ -20,7 +21,7 @@ class CategoryBreakdownCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final slices = ref.watch(categoryBreakdownProvider);
-    final totalCents = ref.watch(spendingSummaryProvider).monthlyTotalCents;
+    final total = ref.watch(spendingSummaryProvider).monthlyTotal;
 
     return AppCard(
       child: Column(
@@ -45,7 +46,7 @@ class CategoryBreakdownCard extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           LayoutBuilder(
             builder: (context, constraints) {
-              final donut = _Donut(slices: slices, totalCents: totalCents);
+              final donut = _Donut(slices: slices, total: total);
               final legend = _Legend(slices: slices);
               if (constraints.maxWidth < _stackBreakpoint) {
                 return Column(
@@ -90,10 +91,10 @@ class _PeriodPill extends StatelessWidget {
 }
 
 class _Donut extends StatelessWidget {
-  const _Donut({required this.slices, required this.totalCents});
+  const _Donut({required this.slices, required this.total});
 
   final List<CategorySpend> slices;
-  final int totalCents;
+  final Money total;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +122,7 @@ class _Donut extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    CurrencyFormatter.formatCents(totalCents),
+                    CurrencyFormatter.format(total),
                     maxLines: 1,
                     style: AppTypography.amountMedium,
                   ),
@@ -152,7 +153,7 @@ class _DonutPainter extends CustomPainter {
     final radius = (math.min(size.width, size.height) - thickness) / 2;
     final center = size.center(Offset.zero);
     final rect = Rect.fromCircle(center: center, radius: radius);
-    final total = slices.fold(0, (sum, s) => sum + s.totalCents);
+    final total = slices.fold(0, (sum, s) => sum + s.total.minorUnits);
     if (total == 0) return;
 
     final gap = slices.length > 1 ? _gapRadians : 0.0;
@@ -160,7 +161,10 @@ class _DonutPainter extends CustomPainter {
     var start = -math.pi / 2 + gap / 2;
 
     for (final slice in slices) {
-      final sweep = math.max(0.0, sweepAvailable * slice.totalCents / total);
+      final sweep = math.max(
+        0.0,
+        sweepAvailable * slice.total.minorUnits / total,
+      );
       if (sweep > 0) {
         if (slice.category == null) {
           _paintHatched(canvas, center, radius, start, sweep, thickness);
@@ -255,7 +259,7 @@ class _LegendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amount = CurrencyFormatter.formatCents(slice.totalCents);
+    final amount = CurrencyFormatter.format(slice.total);
     return Semantics(
       container: true,
       label: '${slice.label}, ${slice.percent} percent, $amount per month',

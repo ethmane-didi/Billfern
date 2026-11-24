@@ -2,10 +2,12 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../../core/money/money.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../shared/models/subscription.dart';
+import '../../../../shared/providers/currency_providers.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/subscription_logo.dart';
@@ -25,6 +27,7 @@ class RecentlyAddedSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subs = ref.watch(recentlyAddedSubscriptionsProvider);
+    final converter = ref.watch(moneyConverterProvider);
     final summary = ref.watch(spendingSummaryProvider);
     final counts = summary.pausedCount == 0
         ? '${summary.activeCount} active'
@@ -44,6 +47,9 @@ class RecentlyAddedSection extends ConsumerWidget {
           if (i > 0) const SizedBox(height: AppSpacing.sm),
           _SubscriptionRow(
             subscription: subs[i],
+            convertedPrice: subs[i].currencyCode == converter.targetCurrency
+                ? null
+                : converter.convert(subs[i].price),
             onTap: () => onSubscriptionTap(subs[i]),
           ),
         ],
@@ -53,16 +59,27 @@ class RecentlyAddedSection extends ConsumerWidget {
 }
 
 class _SubscriptionRow extends StatelessWidget {
-  const _SubscriptionRow({required this.subscription, required this.onTap});
+  const _SubscriptionRow({
+    required this.subscription,
+    required this.convertedPrice,
+    required this.onTap,
+  });
 
   final Subscription subscription;
+
+  /// Price in the display currency, shown as a hint when the subscription is
+  /// billed in another currency; `null` otherwise.
+  final Money? convertedPrice;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final sub = subscription;
+    final cycle = sub.billingCycle.shortLabel;
+    final converted = convertedPrice;
     final price =
-        '${CurrencyFormatter.formatCents(sub.priceCents)}/${sub.billingCycle.shortLabel}';
+        '${CurrencyFormatter.format(sub.price)}/$cycle'
+        '${converted == null ? '' : ' (≈ ${CurrencyFormatter.format(converted)})'}';
     final detail = sub.isActive
         ? 'Added ${DateLabels.shortDate(sub.startedOn)} · $price'
         : 'Paused · $price';

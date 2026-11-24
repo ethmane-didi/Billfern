@@ -4,12 +4,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../shared/providers/currency_providers.dart';
 import '../../../../shared/providers/user_provider.dart';
+import '../../../../shared/widgets/conversion_note.dart';
+import '../../../../shared/widgets/currency_selector.dart';
 import '../providers/dashboard_providers.dart';
 
-/// Hero figure on the gradient: greeting, total monthly spending, the yearly
-/// projection, and three stat chips (active count, change vs last month,
-/// due this week).
+/// Hero figure on the gradient: greeting, total monthly spending in the
+/// preferred currency (with a selector and an estimate note when amounts
+/// were converted), the yearly projection, and three stat chips.
 class SpendingOverview extends ConsumerWidget {
   const SpendingOverview({super.key});
 
@@ -18,13 +21,15 @@ class SpendingOverview extends ConsumerWidget {
     final summary = ref.watch(spendingSummaryProvider);
     final greeting = ref.watch(greetingProvider);
     final user = ref.watch(currentUserProvider);
-    final dueThisWeek = ref.watch(dueThisWeekCentsProvider);
+    final dueThisWeek = ref.watch(dueThisWeekProvider);
+    final converter = ref.watch(moneyConverterProvider);
 
-    final total = CurrencyFormatter.formatCents(summary.monthlyTotalCents);
-    final yearly = CurrencyFormatter.formatCents(
-      summary.projectedYearlyCents,
-      decimalDigits: 0,
+    final total = CurrencyFormatter.format(summary.monthlyTotal);
+    final yearly = CurrencyFormatter.format(
+      summary.projectedYearly,
+      showDecimals: false,
     );
+    final approx = summary.isEstimate ? '≈ ' : '';
     final change = summary.changePercent;
 
     return Column(
@@ -41,20 +46,35 @@ class SpendingOverview extends ConsumerWidget {
         const SizedBox(height: AppSpacing.xs),
         Semantics(
           container: true,
-          label: 'Total monthly spending, $total',
+          label:
+              'Total monthly spending, ${summary.isEstimate ? 'about ' : ''}$total',
           excludeSemantics: true,
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(total, maxLines: 1, style: AppTypography.amountHero),
+            child: Text(
+              '$approx$total',
+              maxLines: 1,
+              style: AppTypography.amountHero,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Total monthly spending · $yearly a year',
+          'Total monthly spending · $approx$yearly a year',
           textAlign: TextAlign.center,
           style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
         ),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.xxs),
+        const CurrencySelector(),
+        ConversionNote(
+          isEstimate: summary.isEstimate,
+          usesMockRates: converter.usesMockRates,
+          ratesAreStale: converter.ratesAreStale,
+          excludedCount: summary.excludedCount,
+          missingCurrencies: summary.missingCurrencies,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             Expanded(
@@ -85,7 +105,7 @@ class SpendingOverview extends ConsumerWidget {
               child: _StatChip(
                 icon: LucideIcons.calendarClock,
                 caption: 'This week',
-                value: CurrencyFormatter.formatCents(dueThisWeek),
+                value: CurrencyFormatter.format(dueThisWeek),
               ),
             ),
           ],

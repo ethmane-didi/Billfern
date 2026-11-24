@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../domain/dashboard_models.dart';
 import '../providers/dashboard_providers.dart';
 
 /// "Smart tip" card previewing a savings recommendation.
@@ -20,7 +22,7 @@ class AiInsightCard extends ConsumerWidget {
     final insight = ref.watch(savingsInsightProvider);
     final title = insight?.title ?? 'No savings found right now';
     final message =
-        insight?.message ??
+        (insight == null ? null : describeInsight(insight)) ??
         'No overlapping subscriptions found. New tips will appear here.';
 
     return AppCard(
@@ -69,6 +71,18 @@ class AiInsightCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// User-facing wording of [insight], with the savings formatted in the
+/// display currency ("about" when converted from another currency).
+String describeInsight(SavingsInsight insight) {
+  final names = [for (final sub in insight.subscriptions) sub.name];
+  final joined = names.length == 2
+      ? 'both ${names[0]} and ${names[1]}'
+      : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+  final savings = CurrencyFormatter.format(insight.annualSavings);
+  return 'You pay for $joined. Keeping just ${insight.keep.name} could save '
+      'you ${insight.isEstimate ? 'about ' : ''}$savings a year.';
 }
 
 class _SampleTag extends StatelessWidget {
