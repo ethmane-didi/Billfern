@@ -1,11 +1,11 @@
 {
-    "name": "renuloom",
-    "short_name": "renuloom",
+    "name": "Billfern",
+    "short_name": "Billfern",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Billfern: AI-powered subscription tracker and personal finance app. Track smarter. Spend less.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

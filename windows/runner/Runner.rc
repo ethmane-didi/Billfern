@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.renuloom" "\0"
-            VALUE "FileDescription", "renuloom" "\0"
+            VALUE "CompanyName", "com.billfern" "\0"
+            VALUE "FileDescription", "Billfern" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "renuloom" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.renuloom. All rights reserved." "\0"
-            VALUE "OriginalFilename", "renuloom.exe" "\0"
-            VALUE "ProductName", "renuloom" "\0"
+            VALUE "InternalName", "billfern" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.billfern. All rights reserved." "\0"
+            VALUE "OriginalFilename", "billfern.exe" "\0"
+            VALUE "ProductName", "Billfern" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

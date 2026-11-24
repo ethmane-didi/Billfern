@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = renuloom
+PRODUCT_NAME = billfern
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.renuloom.renuloom
+PRODUCT_BUNDLE_IDENTIFIER = com.billfern.app
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.renuloom. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.billfern. All rights reserved.
