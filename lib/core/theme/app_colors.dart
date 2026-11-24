@@ -97,6 +97,49 @@ abstract final class AppColors {
 
   static const Color transparent = Color(0x00000000);
 
+  // ---------------------------------------------------------------------------
+  // Data visualisation
+  // ---------------------------------------------------------------------------
+
+  /// Highlighted bar (current period) in charts.
+  static const Color chartHighlight = midnight;
+
+  /// Non-highlighted bars (past periods) in charts.
+  static const Color chartMuted = Color(0xFFD5D6EA);
+
+  /// Category series colours, in legend order.
+  static const Color chartMidnight = midnight;
+  static const Color chartYellow = yellow;
+  static const Color chartMint = mint;
+  static const Color chartLavender = Color(0xFF9C9FD6);
+  static const Color chartPeach = Color(0xFFFFA97E);
+  static const Color chartSky = Color(0xFF79AEF0);
+  static const Color chartRose = Color(0xFFF08BB0);
+  static const Color chartViolet = Color(0xFFB79CF2);
+  static const Color chartSlate = Color(0xFF8A94A8);
+  static const Color chartGreen = Color(0xFF8FCB7E);
+  static const Color chartSand = Color(0xFFE2C38F);
+  static const Color chartCoral = Color(0xFFF2877E);
+
+  /// Hatch lines drawn over the "Other" slice.
+  static const Color chartHatch = Color(0xFFB4B4BC);
+
+  // ---------------------------------------------------------------------------
+  // Logos & glass surfaces
+  // ---------------------------------------------------------------------------
+
+  /// Neutral tile behind dark or monochrome brand marks.
+  static const Color logoTileNeutral = Color(0xFFF1F1F4);
+
+  /// Translucent white used for chips and pills floating on the gradient.
+  static const Color surfaceTranslucent = Color(0xB8FFFFFF);
+
+  /// Cool mint-grey at the bottom of the background gradient.
+  static const Color mintMist = Color(0xFFE4EFEC);
+
+  /// Aggregated "Other" slice.
+  static const Color chartOther = Color(0xFFC9C9CF);
+
   /// Background tints for subscription icons without a brand color.
   static const List<Color> iconTints = [
     lavender,
