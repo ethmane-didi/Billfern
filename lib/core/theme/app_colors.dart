@@ -140,6 +140,9 @@ abstract final class AppColors {
   /// Aggregated "Other" slice.
   static const Color chartOther = Color(0xFFC9C9CF);
 
+  /// Opacity of a soft tile behind a series-coloured icon (category rows).
+  static const double seriesTintAlpha = 0.18;
+
   /// Background tints for subscription icons without a brand color.
   static const List<Color> iconTints = [
     lavender,

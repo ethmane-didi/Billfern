@@ -12,13 +12,21 @@ import 'subscription_codec.dart';
 /// through to the backing store. A future Supabase implementation can keep
 /// this shape (load once, then cache) or `subscriptionsProvider` can move to
 /// an `AsyncNotifier`.
+///
+/// Removed subscriptions that already contributed to past months are kept
+/// as **ended** records ([Subscription.endedOn]) so history never changes
+/// after a deletion; [fetchAll] never returns them.
 abstract interface class SubscriptionRepository {
-  /// Current subscriptions, in insertion order.
+  /// Current (not ended) subscriptions, in insertion order.
   List<Subscription> fetchAll();
+
+  /// Removed subscriptions kept only for spending history.
+  List<Subscription> fetchEnded();
 
   /// Inserts or replaces the subscription with the same id.
   Future<void> save(Subscription subscription);
 
+  /// Permanently removes the record, history included.
   Future<void> delete(String id);
 }
 
@@ -33,7 +41,12 @@ class InMemorySubscriptionRepository implements SubscriptionRepository {
   final Map<String, Subscription> _items = {};
 
   @override
-  List<Subscription> fetchAll() => List.unmodifiable(_items.values);
+  List<Subscription> fetchAll() =>
+      List.unmodifiable(_items.values.where((sub) => !sub.isEnded));
+
+  @override
+  List<Subscription> fetchEnded() =>
+      List.unmodifiable(_items.values.where((sub) => sub.isEnded));
 
   @override
   Future<void> save(Subscription subscription) async {
@@ -87,7 +100,12 @@ class SembastSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
-  List<Subscription> fetchAll() => List.unmodifiable(_cache.values);
+  List<Subscription> fetchAll() =>
+      List.unmodifiable(_cache.values.where((sub) => !sub.isEnded));
+
+  @override
+  List<Subscription> fetchEnded() =>
+      List.unmodifiable(_cache.values.where((sub) => sub.isEnded));
 
   @override
   Future<void> save(Subscription subscription) async {

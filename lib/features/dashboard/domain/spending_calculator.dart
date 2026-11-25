@@ -42,8 +42,10 @@ abstract final class SpendingCalculator {
     );
   }
 
-  /// Monthly-equivalent spending of the subscriptions billed in the month
-  /// starting at [month].
+  /// Estimated monthly-equivalent spending of the subscriptions billed in
+  /// the month starting at [month], each at the price that applied that
+  /// month (see [Subscription.monthlyCostForMonth]). Pass ended
+  /// subscriptions too, so removing one never rewrites past months.
   static ConvertedTotal totalForMonth(
     Iterable<Subscription> subs,
     DateTime month,
@@ -52,7 +54,7 @@ abstract final class SpendingCalculator {
     final monthStart = DateMath.monthStart(month);
     return convertedSum(
       subs.where((sub) => sub.isBilledInMonth(monthStart)),
-      (sub) => sub.monthlyCost,
+      (sub) => sub.monthlyCostForMonth(monthStart),
       converter,
     );
   }
@@ -80,7 +82,8 @@ abstract final class SpendingCalculator {
     ];
   }
 
-  /// Headline figures for the month containing [today].
+  /// Headline figures for the month containing [today]. [subs] may include
+  /// ended subscriptions (they only affect earlier months).
   static SpendingSummary summary(
     Iterable<Subscription> subs,
     DateTime today,
@@ -100,7 +103,7 @@ abstract final class SpendingCalculator {
       previousMonthTotal: lastMonth.total,
       projectedYearly: yearly.total,
       activeCount: active.length,
-      pausedCount: subs.length - active.length,
+      pausedCount: subs.where((sub) => sub.isPaused).length,
       isEstimate: thisMonth.isConverted || yearly.isConverted,
       excludedCount: thisMonth.excludedCount,
       missingCurrencies: {
@@ -195,6 +198,38 @@ abstract final class SpendingCalculator {
           : a.subscription.name.compareTo(b.subscription.name);
     });
     return renewals;
+  }
+
+  /// Every projected payment of charging subscriptions from [today] to
+  /// [withinDays] days later (both inclusive), soonest first. Unlike
+  /// [upcomingRenewals], a subscription can appear several times (a weekly
+  /// plan has about 13 payments in 90 days). Paused and ended subscriptions
+  /// are not projected.
+  static List<ProjectedPayment> projectedPayments(
+    Iterable<Subscription> subs,
+    DateTime today,
+    MoneyConverter converter, {
+    required int withinDays,
+  }) {
+    final from = DateMath.dateOnly(today);
+    final to = DateTime(from.year, from.month, from.day + withinDays);
+    final payments = <ProjectedPayment>[
+      for (final sub in subs)
+        for (final date in sub.billingDatesBetween(from, to))
+          ProjectedPayment(
+            subscription: sub,
+            date: date,
+            daysUntil: DateMath.daysBetween(from, date),
+            convertedAmount: converter.convert(sub.price),
+          ),
+    ];
+    payments.sort((a, b) {
+      final byDate = a.date.compareTo(b.date);
+      return byDate != 0
+          ? byDate
+          : a.subscription.name.compareTo(b.subscription.name);
+    });
+    return payments;
   }
 
   /// Converts [values] into whole percentages that sum to exactly 100 using

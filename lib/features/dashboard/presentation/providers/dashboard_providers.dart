@@ -24,9 +24,11 @@ final greetingProvider = Provider<String>((ref) {
   return 'Good evening';
 });
 
+/// Headline figures. Uses the full history (including removed
+/// subscriptions) so last month's total never changes after a deletion.
 final spendingSummaryProvider = Provider<SpendingSummary>((ref) {
   return SpendingCalculator.summary(
-    ref.watch(subscriptionsProvider),
+    ref.watch(subscriptionHistoryProvider),
     ref.watch(todayProvider),
     ref.watch(moneyConverterProvider),
   );
@@ -34,7 +36,7 @@ final spendingSummaryProvider = Provider<SpendingSummary>((ref) {
 
 final spendingHistoryProvider = Provider<List<MonthlySpend>>((ref) {
   return SpendingCalculator.monthlyHistory(
-    ref.watch(subscriptionsProvider),
+    ref.watch(subscriptionHistoryProvider),
     ref.watch(todayProvider),
     ref.watch(moneyConverterProvider),
     months: dashboardHistoryMonths,
@@ -64,14 +66,20 @@ final dueSoonRenewalsProvider = Provider<List<UpcomingRenewal>>((ref) {
   ];
 });
 
-/// Total charged by renewals in the next seven days, in the display
-/// currency. Renewals without an exchange rate are left out.
+/// Total of every projected payment in the next seven days, in the display
+/// currency (the same projection as Analytics' upcoming payments). Payments
+/// without an exchange rate are left out.
 final dueThisWeekProvider = Provider<Money>((ref) {
-  return Money.sum([
-    for (final renewal in ref.watch(upcomingRenewalsProvider))
-      if (renewal.daysUntil <= 7 && renewal.convertedAmount != null)
-        renewal.convertedAmount!,
-  ], ref.watch(preferredCurrencyProvider));
+  return SpendingCalculator.convertedSum(
+    SpendingCalculator.projectedPayments(
+      ref.watch(subscriptionsProvider),
+      ref.watch(todayProvider),
+      ref.watch(moneyConverterProvider),
+      withinDays: 7,
+    ).map((payment) => payment.subscription),
+    (sub) => sub.price,
+    ref.watch(moneyConverterProvider),
+  ).total;
 });
 
 /// Number of rows in the dashboard's "Recently added" list.

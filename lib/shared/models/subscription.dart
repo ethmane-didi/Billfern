@@ -38,6 +38,42 @@ class PausePeriod {
   int get hashCode => Object.hash(from, until);
 }
 
+/// Billing terms that applied **before** a price, currency or billing-cycle
+/// change: [priceMinor] in [currencyCode] every [billingCycle], in force
+/// until [until] (exclusive). Kept so past months are never recalculated
+/// with today's price.
+@immutable
+class PriceRevision {
+  const PriceRevision({
+    required this.until,
+    required this.priceMinor,
+    required this.currencyCode,
+    required this.billingCycle,
+  });
+
+  final DateTime until;
+  final int priceMinor;
+  final String currencyCode;
+  final BillingCycle billingCycle;
+
+  Money get price => Money(priceMinor, currencyCode);
+
+  /// Equivalent monthly cost under these terms.
+  Money get monthlyCost => billingCycle.monthlyCost(price);
+
+  @override
+  bool operator ==(Object other) =>
+      other is PriceRevision &&
+      other.until == until &&
+      other.priceMinor == priceMinor &&
+      other.currencyCode == currencyCode &&
+      other.billingCycle == billingCycle;
+
+  @override
+  int get hashCode =>
+      Object.hash(until, priceMinor, currencyCode, billingCycle);
+}
+
 /// A recurring payment the user tracks.
 ///
 /// The price is stored in integer minor units ([priceMinor]) of the
@@ -69,6 +105,8 @@ class Subscription {
     this.status = SubscriptionStatus.active,
     this.pausedOn,
     this.pauseHistory = const [],
+    this.priceHistory = const [],
+    this.endedOn,
     this.reminder = ReminderPreference.oneDayBefore,
     this.notes,
     this.createdAt,
@@ -122,6 +160,16 @@ class Subscription {
   /// Earlier, finished pauses (oldest first).
   final List<PausePeriod> pauseHistory;
 
+  /// Earlier billing terms (oldest first), recorded whenever the price,
+  /// currency or billing cycle changes. Each applies until its `until`
+  /// date; the current fields apply from the last one onwards.
+  final List<PriceRevision> priceHistory;
+
+  /// When the user removed the subscription. Ended subscriptions are kept
+  /// only so the spending history of earlier months stays intact; they never
+  /// appear in lists, totals for the current month or projections.
+  final DateTime? endedOn;
+
   /// When to remind the user before a renewal. Stored now; notifications are
   /// scheduled in a later phase.
   final ReminderPreference reminder;
@@ -131,7 +179,14 @@ class Subscription {
   /// When the user added the subscription to Billfern.
   final DateTime? createdAt;
 
-  bool get isActive => status == SubscriptionStatus.active;
+  /// Charging now: not paused and not removed.
+  bool get isActive => status == SubscriptionStatus.active && endedOn == null;
+
+  /// Removed by the user; kept only for history.
+  bool get isEnded => endedOn != null;
+
+  /// Paused (and not removed).
+  bool get isPaused => status == SubscriptionStatus.paused && endedOn == null;
 
   /// Price per [billingCycle], in [currencyCode].
   Money get price => Money(priceMinor, currencyCode);
@@ -141,6 +196,17 @@ class Subscription {
 
   /// Cost over twelve months, in [currencyCode].
   Money get annualCost => billingCycle.annualCost(price);
+
+  /// Equivalent monthly cost under the terms in force on [day], in the
+  /// currency charged then. Days before the first recorded change use the
+  /// oldest terms; days after the last change use the current terms.
+  Money monthlyCostOn(DateTime day) {
+    final date = DateMath.dateOnly(day);
+    for (final revision in priceHistory) {
+      if (date.isBefore(revision.until)) return revision.monthlyCost;
+    }
+    return monthlyCost;
+  }
 
   /// When the subscription was added, falling back to its billing anchor.
   DateTime get addedOn => createdAt ?? startedOn;
@@ -153,17 +219,52 @@ class Subscription {
   }
 
   /// Whether this subscription counts towards spending in the calendar month
-  /// starting at [monthStart]: it had started before the month ended and was
-  /// not paused on the month's last day. Past months keep counting after a
-  /// later pause, and months spent paused stay excluded after resuming.
+  /// starting at [monthStart]: it had started before the month ended, was
+  /// not paused on the month's last day and had not been removed by then.
+  /// Past months keep counting after a later pause, price change or removal,
+  /// and months spent paused stay excluded after resuming.
   bool isBilledInMonth(DateTime monthStart) {
     final nextMonth = DateMath.addMonths(DateMath.monthStart(monthStart), 1);
-    final lastDay = DateTime(
-      nextMonth.year,
-      nextMonth.month,
-      nextMonth.day - 1,
-    );
-    return startedOn.isBefore(nextMonth) && !isPausedOn(lastDay);
+    final lastDay = lastDayOfMonth(monthStart);
+    final ended = endedOn;
+    return startedOn.isBefore(nextMonth) &&
+        !isPausedOn(lastDay) &&
+        (ended == null || lastDay.isBefore(ended));
+  }
+
+  /// Monthly-equivalent cost counted for the month starting at
+  /// [monthStart], using the terms in force on its last day — the same day
+  /// [isBilledInMonth] checks.
+  Money monthlyCostForMonth(DateTime monthStart) =>
+      monthlyCostOn(lastDayOfMonth(monthStart));
+
+  /// Last calendar day of the month containing [date].
+  static DateTime lastDayOfMonth(DateTime date) => DateTime(
+    date.year,
+    date.month,
+    DateMath.daysInMonth(date.year, date.month),
+  );
+
+  /// Billing dates from [from] to [to] (both inclusive), oldest first.
+  /// Empty unless the subscription is charging. Dates are computed from the
+  /// billing anchor (never by chaining), so month-end and leap-day anchors
+  /// return to their day whenever the month allows it.
+  Iterable<DateTime> billingDatesBetween(DateTime from, DateTime to) sync* {
+    if (!isActive) return;
+    final start = DateMath.dateOnly(from);
+    final end = DateMath.dateOnly(to);
+    final anchor = DateMath.dateOnly(billingAnchor ?? startedOn);
+    final cycle = billingCycle;
+    var periods = anchor.isBefore(start)
+        ? cycle.approximatePeriodsBetween(anchor, start) - 1
+        : 0;
+    if (periods < 0) periods = 0;
+    while (true) {
+      final date = cycle.advance(anchor, periods);
+      if (date.isAfter(end)) return;
+      if (!date.isBefore(start)) yield date;
+      periods++;
+    }
   }
 
   /// The next billing date on or after [today], or `null` when paused.
@@ -202,7 +303,7 @@ class Subscription {
   /// already active.
   Subscription resume(DateTime today) {
     final from = pausedOn;
-    if (isActive || from == null) return this;
+    if (!isPaused || from == null) return this;
     final until = DateMath.dateOnly(today);
     return Subscription(
       id: id,
@@ -222,11 +323,94 @@ class Subscription {
         ...pauseHistory,
         if (until.isAfter(from)) PausePeriod(from: from, until: until),
       ],
+      priceHistory: priceHistory,
+      endedOn: endedOn,
       reminder: reminder,
       notes: notes,
       createdAt: createdAt,
     );
   }
+
+  /// Whether the billing terms (price, currency or cycle) differ from
+  /// [other]'s.
+  bool hasDifferentTermsFrom(Subscription other) =>
+      other.priceMinor != priceMinor ||
+      other.currencyCode != currencyCode ||
+      other.billingCycle != billingCycle;
+
+  /// This edit of [previous], with [previous]'s terms recorded in
+  /// [priceHistory] when the price, currency or cycle changed on [today].
+  ///
+  /// Nothing is recorded when the terms are unchanged, when the subscription
+  /// has not started yet, or when the terms already changed earlier today
+  /// (the terms before today are already recorded).
+  Subscription revisedFrom(Subscription previous, DateTime today) {
+    final day = DateMath.dateOnly(today);
+    final history = previous.priceHistory;
+    if (!hasDifferentTermsFrom(previous) ||
+        !day.isAfter(DateMath.dateOnly(previous.startedOn)) ||
+        (history.isNotEmpty && !day.isAfter(history.last.until))) {
+      return _withPriceHistory(history);
+    }
+    return _withPriceHistory([
+      ...history,
+      PriceRevision(
+        until: day,
+        priceMinor: previous.priceMinor,
+        currencyCode: previous.currencyCode,
+        billingCycle: previous.billingCycle,
+      ),
+    ]);
+  }
+
+  /// A removed copy, ended on [today], kept for history only.
+  Subscription end(DateTime today) => Subscription(
+    id: id,
+    name: name,
+    plan: plan,
+    priceMinor: priceMinor,
+    currencyCode: currencyCode,
+    billingCycle: billingCycle,
+    category: category,
+    startedOn: startedOn,
+    billingAnchor: billingAnchor,
+    catalogId: catalogId,
+    websiteDomain: websiteDomain,
+    customColor: customColor,
+    customGlyph: customGlyph,
+    status: status,
+    pausedOn: pausedOn,
+    pauseHistory: pauseHistory,
+    priceHistory: priceHistory,
+    endedOn: DateMath.dateOnly(today),
+    reminder: reminder,
+    notes: notes,
+    createdAt: createdAt,
+  );
+
+  Subscription _withPriceHistory(List<PriceRevision> history) => Subscription(
+    id: id,
+    name: name,
+    plan: plan,
+    priceMinor: priceMinor,
+    currencyCode: currencyCode,
+    billingCycle: billingCycle,
+    category: category,
+    startedOn: startedOn,
+    billingAnchor: billingAnchor,
+    catalogId: catalogId,
+    websiteDomain: websiteDomain,
+    customColor: customColor,
+    customGlyph: customGlyph,
+    status: status,
+    pausedOn: pausedOn,
+    pauseHistory: pauseHistory,
+    priceHistory: history,
+    endedOn: endedOn,
+    reminder: reminder,
+    notes: notes,
+    createdAt: createdAt,
+  );
 
   /// A copy with the given fields replaced. Use [pause]/[resume] to change
   /// status so pause history stays consistent.
@@ -262,6 +446,8 @@ class Subscription {
       status: status ?? this.status,
       pausedOn: pausedOn ?? this.pausedOn,
       pauseHistory: pauseHistory,
+      priceHistory: priceHistory,
+      endedOn: endedOn,
       reminder: reminder ?? this.reminder,
       notes: notes ?? this.notes,
       createdAt: createdAt,
@@ -289,12 +475,14 @@ class Subscription {
       other.status == status &&
       other.pausedOn == pausedOn &&
       listEquals(other.pauseHistory, pauseHistory) &&
+      listEquals(other.priceHistory, priceHistory) &&
+      other.endedOn == endedOn &&
       other.reminder == reminder &&
       other.notes == notes &&
       other.createdAt == createdAt;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     plan,
@@ -311,10 +499,12 @@ class Subscription {
     status,
     pausedOn,
     Object.hashAll(pauseHistory),
+    Object.hashAll(priceHistory),
+    endedOn,
     reminder,
     notes,
     createdAt,
-  );
+  ]);
 
   @override
   String toString() =>

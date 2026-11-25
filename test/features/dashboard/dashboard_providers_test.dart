@@ -25,6 +25,9 @@ class _DuplicatingRepository implements SubscriptionRepository {
   List<Subscription> fetchAll() => [...inner.fetchAll(), ...inner.fetchAll()];
 
   @override
+  List<Subscription> fetchEnded() => inner.fetchEnded();
+
+  @override
   Future<void> save(Subscription subscription) => inner.save(subscription);
 
   @override

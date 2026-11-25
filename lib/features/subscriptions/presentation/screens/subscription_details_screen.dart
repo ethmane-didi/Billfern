@@ -327,7 +327,8 @@ class _Actions extends ConsumerWidget {
         context,
         title: 'Delete ${sub.name}?',
         message:
-            'This removes the subscription and its history from Billfern. '
+            'This removes the subscription from your list, renewals and '
+            'projections. Spending in earlier months stays in your history. '
             'It does not cancel the service with the provider.',
         confirmLabel: 'Delete subscription',
         destructive: true,

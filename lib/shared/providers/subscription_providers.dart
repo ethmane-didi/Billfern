@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_math.dart';
 import '../data/app_preference_store.dart';
 import '../data/subscription_repository.dart';
 import '../models/subscription.dart';
@@ -108,8 +109,17 @@ class SubscriptionsNotifier extends Notifier<List<Subscription>> {
   }
 
   /// Replaces an existing subscription (matched by id).
+  ///
+  /// When the price, currency or billing cycle changes, the previous terms
+  /// are recorded in [Subscription.priceHistory] so earlier months keep the
+  /// price that applied then. The stored history always comes from the
+  /// existing record, so an edit can never drop it.
   Future<void> update(Subscription subscription) async {
-    await _repository.save(subscription);
+    final previous = byId(subscription.id);
+    final next = previous == null
+        ? subscription
+        : subscription.revisedFrom(previous, _today);
+    await _repository.save(next);
     _refresh();
   }
 
@@ -117,8 +127,19 @@ class SubscriptionsNotifier extends Notifier<List<Subscription>> {
 
   Future<void> resume(String id) => _change(id, (s) => s.resume(_today));
 
+  /// Removes a subscription from the user's list.
+  ///
+  /// When it already counted towards an earlier month it is kept as an
+  /// ended record so the spending history does not change; one added this
+  /// month has no history and is deleted outright.
   Future<void> delete(String id) async {
-    await _repository.delete(id);
+    final current = byId(id);
+    final monthStart = DateMath.monthStart(_today);
+    if (current != null && current.startedOn.isBefore(monthStart)) {
+      await _repository.save(current.end(_today));
+    } else {
+      await _repository.delete(id);
+    }
     _refresh();
   }
 
@@ -145,6 +166,24 @@ final subscriptionsProvider =
     NotifierProvider<SubscriptionsNotifier, List<Subscription>>(
       SubscriptionsNotifier.new,
     );
+
+/// Removed subscriptions kept only for spending history (see
+/// [SubscriptionsNotifier.delete]). Recomputed after every mutation.
+final endedSubscriptionsProvider = Provider<List<Subscription>>((ref) {
+  ref.watch(subscriptionsProvider);
+  return ref.watch(subscriptionRepositoryProvider).fetchEnded();
+});
+
+/// Every subscription that can affect spending history: current ones plus
+/// ended ones. History calculations (monthly totals of past months) use
+/// this; lists, renewals, categories and projections use
+/// [subscriptionsProvider].
+final subscriptionHistoryProvider = Provider<List<Subscription>>((ref) {
+  return List.unmodifiable([
+    ...ref.watch(subscriptionsProvider),
+    ...ref.watch(endedSubscriptionsProvider),
+  ]);
+});
 
 /// Subscriptions that are currently charging.
 final activeSubscriptionsProvider = Provider<List<Subscription>>((ref) {

@@ -59,4 +59,15 @@ abstract final class AppSizes {
   static const double numberFieldWidth = 96;
   static const double priceColumnMaxWidth = 132;
   static const double detailLogo = 72;
+
+  // Analytics
+  /// Height of the interactive spending trend chart.
+  static const double analyticsChartHeight = 176;
+
+  /// Circular share indicator in category rows.
+  static const double progressRing = 48;
+  static const double progressRingStroke = 4;
+
+  /// Category icon tile in analytics rows.
+  static const double categoryTile = 44;
 }

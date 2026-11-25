@@ -10,9 +10,15 @@ import '../models/subscription_glyph.dart';
 ///
 /// Money stays in integer minor units with its currency code; dates are
 /// stored as ISO-8601 calendar dates. [schemaVersion] is written with every
-/// record so future migrations can recognise old data.
+/// record so migrations can recognise old data.
+///
+/// Versions:
+/// - **1**: Phase 3 fields.
+/// - **2**: adds `priceHistory` (earlier billing terms) and `endedOn`
+///   (removed subscriptions kept for history). Version 1 records read as
+///   having no price changes and not ended, so they decode unchanged.
 abstract final class SubscriptionCodec {
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
 
   static Map<String, Object?> toMap(Subscription s) => {
     'schema': schemaVersion,
@@ -35,6 +41,16 @@ abstract final class SubscriptionCodec {
       for (final p in s.pauseHistory)
         {'from': _date(p.from), 'until': _date(p.until)},
     ],
+    'priceHistory': [
+      for (final r in s.priceHistory)
+        {
+          'until': _date(r.until),
+          'priceMinor': r.priceMinor,
+          'currencyCode': r.currencyCode,
+          'billingCycle': r.billingCycle.toJson(),
+        },
+    ],
+    'endedOn': s.endedOn == null ? null : _date(s.endedOn!),
     'reminder': s.reminder.name,
     'notes': s.notes,
     'createdAt': s.createdAt?.toIso8601String(),
@@ -95,12 +111,42 @@ abstract final class SubscriptionCodec {
               until: _parseDate(entry['until'])!,
             ),
       ],
+      priceHistory: _parsePriceHistory(map['priceHistory']),
+      endedOn: _parseDate(map['endedOn']),
       reminder: ReminderPreference.fromName(map['reminder']),
       notes: map['notes'] as String?,
       createdAt: map['createdAt'] is String
           ? DateTime.tryParse(map['createdAt']! as String)
           : null,
     );
+  }
+
+  /// Valid revisions, oldest first. Malformed entries are dropped rather
+  /// than failing the whole record.
+  static List<PriceRevision> _parsePriceHistory(Object? value) {
+    final revisions = <PriceRevision>[];
+    for (final entry in (value as List?) ?? const []) {
+      if (entry is! Map) continue;
+      final until = _parseDate(entry['until']);
+      final price = entry['priceMinor'];
+      final currency = entry['currencyCode'];
+      if (until == null ||
+          price is! int ||
+          price < 0 ||
+          currency is! String ||
+          currency.isEmpty) {
+        continue;
+      }
+      revisions.add(
+        PriceRevision(
+          until: until,
+          priceMinor: price,
+          currencyCode: currency,
+          billingCycle: BillingCycle.fromJson(entry['billingCycle']),
+        ),
+      );
+    }
+    return revisions..sort((a, b) => a.until.compareTo(b.until));
   }
 
   static String _date(DateTime d) =>

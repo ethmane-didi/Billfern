@@ -133,6 +133,27 @@ class UpcomingRenewal {
   final Money? convertedAmount;
 }
 
+/// One expected future payment (a **projection**, not a confirmed charge).
+@immutable
+class ProjectedPayment {
+  const ProjectedPayment({
+    required this.subscription,
+    required this.date,
+    required this.daysUntil,
+    required this.convertedAmount,
+  });
+
+  final Subscription subscription;
+  final DateTime date;
+  final int daysUntil;
+
+  /// Amount charged on [date], in the subscription's own currency.
+  Money get amount => subscription.price;
+
+  /// [amount] in the display currency, or `null` when no rate is available.
+  final Money? convertedAmount;
+}
+
 /// A savings recommendation shown in the smart tip card. Presentation
 /// builds the wording, so amounts are formatted in the user's locale.
 @immutable

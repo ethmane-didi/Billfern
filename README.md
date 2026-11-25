@@ -8,7 +8,8 @@ find subscriptions they no longer need, and save money.
 
 > **Status:** early development. Users can manage their own subscriptions (add from an
 > 82-service catalog or create custom ones, edit, pause, resume and delete), stored locally
-> on the device. Exchange rates and AI insights are local sample data. There is no backend yet.
+> on the device, and explore spending analytics. Exchange rates are development mock
+> rates and savings suggestions are local rules, not AI. There is no backend yet.
 
 ## Dashboard
 
@@ -63,9 +64,64 @@ logos are kept separately in `assets/logos/`.
   schedule, category, reminder and notes, with edit, pause or resume, and delete
   (with confirmation).
 - **Storage:** data is stored on the device in a small local database (sembast) and
-  survives restarts. Pausing stops future spending without rewriting past months.
+  survives restarts. Pausing, price changes, billing-cycle changes and deletions
+  never rewrite past months (see [Analytics](#analytics)).
 - **Sample data:** you can explore sample data from the empty state. It's kept
   separate, never saved, and clearly labelled.
+
+## Analytics
+
+The Analytics tab shows, in your display currency:
+
+- **Overview:** this month's spending (the same figure as the dashboard), the change
+  against last month, projected yearly cost, active and paused counts, and the
+  exchange-rate status.
+- **Spending trend:** an interactive chart over 3, 6 or 12 months. Tap a month (or use
+  the arrows) to see its total and the change from the month before. Below the chart
+  are the period total, the monthly average and a comparison with the previous period.
+- **Monthly and yearly summaries:** this month, the average month, the year so far and
+  the next 12 months.
+- **Category breakdown:** each category's monthly spending, share, number of active
+  subscriptions and a progress ring. Tap a category to see the subscriptions in it.
+- **Upcoming payments:** expected payments in the next 7, 30 or 90 days. Every payment
+  in the window is counted, so a weekly plan can appear several times.
+- **Smart suggestions:** local rules flag possible duplicates, several music or
+  streaming services, annual renewals coming up and your largest subscription, with
+  potential monthly and yearly savings.
+
+### How spending is calculated
+
+Every figure is labelled with how it was produced:
+
+| Label | Meaning |
+|---|---|
+| **Estimated** | Past and current months, calculated from your recorded billing schedules, price changes and pauses. Yearly plans are spread evenly across 12 months. |
+| **Projected** | Future payments, calculated from the billing schedules of active subscriptions. |
+| **Confirmed** | Payments you have actually recorded. Not available yet: there is no payment confirmation or bank connection, so all history is estimated. |
+
+Billfern never invents history:
+
+- Months before you started tracking show **no data**, not zero.
+- A trend needs at least two months of history.
+- A change against a month with no spending shows no percentage.
+- Price, currency and billing-cycle changes are saved as revisions, so earlier months
+  keep the price that applied then.
+- Pauses stay in the history.
+- Deleted subscriptions stay in earlier months but leave current totals and
+  projections. A subscription added and deleted in the same month leaves nothing behind.
+
+### Known limitations
+
+- Exchange rates are development mock rates, and converted totals are estimates.
+- Subscriptions in a currency without a rate are left out of totals, and the screen
+  says so.
+- Suggestions only look at your subscription list. Billfern has no usage data, so it
+  never claims that a service is unused.
+- History starts on the day each subscription was added. Earlier spending can't be
+  entered yet.
+- Deleted subscriptions keep their history. You can't erase that history from the app
+  yet.
+- Paused subscriptions are not projected, even if you plan to resume them.
 
 ## Multi-currency
 

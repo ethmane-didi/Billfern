@@ -10,6 +10,7 @@ import 'app.dart';
 import 'core/utils/currency_formatter.dart';
 import 'shared/data/app_preference_store.dart';
 import 'shared/data/currency_preference_store.dart';
+import 'shared/data/subscription_database.dart';
 import 'shared/data/subscription_repository.dart';
 import 'shared/providers/currency_providers.dart';
 import 'shared/providers/subscription_providers.dart';
@@ -35,7 +36,8 @@ Future<void> main() async {
 
   // The user's subscriptions: one record each in a local sembast database.
   final documents = await getApplicationDocumentsDirectory();
-  final database = await databaseFactoryIo.openDatabase(
+  final database = await SubscriptionDatabase.open(
+    databaseFactoryIo,
     '${documents.path}/$databaseFileName',
   );
   final subscriptions = await SembastSubscriptionRepository.open(database);
