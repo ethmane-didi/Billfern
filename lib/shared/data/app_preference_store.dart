@@ -48,5 +48,6 @@ class SharedPreferencesAppStore implements AppPreferenceStore {
 /// Keys used with [AppPreferenceStore]; also the cache allow-list.
 abstract final class PreferenceKeys {
   static const String dataMode = 'data_mode';
-  static const Set<String> all = {dataMode};
+  static const String onboardingCompleted = 'onboarding_completed';
+  static const Set<String> all = {dataMode, onboardingCompleted};
 }

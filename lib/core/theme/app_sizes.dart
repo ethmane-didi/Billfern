@@ -47,6 +47,13 @@ abstract final class AppSizes {
   static const double statChipIcon = 30;
   static const double insightTile = 52;
 
+  // Branding
+  /// Billfern logo next to the wordmark in headers.
+  static const double brandMarkHeader = 40;
+
+  /// Billfern logo in the Settings About card.
+  static const double brandMarkAbout = 72;
+
   // Forms & lists
   static const double inputHeight = 56;
   static const double numberFieldWidth = 96;

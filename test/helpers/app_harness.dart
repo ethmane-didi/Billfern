@@ -1,6 +1,5 @@
 import 'package:billfern/app.dart';
 import 'package:billfern/core/router/app_destination.dart';
-import 'package:billfern/shared/data/app_preference_store.dart';
 import 'package:billfern/shared/data/subscription_repository.dart';
 import 'package:billfern/shared/models/subscription.dart';
 import 'package:billfern/shared/providers/catalog_providers.dart';
@@ -20,6 +19,7 @@ Future<InMemorySubscriptionRepository> pumpBillfern(
   WidgetTester tester, {
   List<Subscription> seed = const [],
   DataMode mode = DataMode.personal,
+  bool onboarded = true,
   Size size = const Size(393, 1400),
   double textScale = 1,
 }) async {
@@ -37,12 +37,9 @@ Future<InMemorySubscriptionRepository> pumpBillfern(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        ...emptyAppTestOverrides,
+        ...baseTestOverrides,
+        ...preferenceOverrides(mode: mode, onboarded: onboarded),
         personalSubscriptionRepositoryProvider.overrideWithValue(repository),
-        appPreferenceStoreProvider.overrideWith(
-          (ref) =>
-              InMemoryAppPreferenceStore({PreferenceKeys.dataMode: mode.name}),
-        ),
         subscriptionIdGeneratorProvider.overrideWithValue(
           () => 'sub-${++counter}',
         ),

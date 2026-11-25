@@ -43,6 +43,12 @@ The visual reference is [`docs/design/dashboard-reference.png`](docs/design/dash
 
 Users will be able to search the catalog or add custom subscriptions (Phase 3).
 
+## Branding
+
+The official Billfern logo lives in `assets/branding/` and is shown on the first-launch
+welcome screen, in the dashboard header and in Settings → About. Third-party service
+logos are kept separately in `assets/logos/`.
+
 ## Subscription management
 
 - **Subscriptions tab:** monthly total, active and paused counts, search, All, Active

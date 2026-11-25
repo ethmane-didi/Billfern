@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/providers/user_provider.dart';
+import '../../../../shared/widgets/billfern_logo.dart';
 import '../../../../shared/widgets/pressable_scale.dart';
 import '../providers/dashboard_providers.dart';
 
@@ -64,18 +65,9 @@ class _Wordmark extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: AppSizes.subscriptionIconSm,
-            height: AppSizes.subscriptionIconSm,
-            decoration: const BoxDecoration(
-              gradient: AppGradients.accent,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              LucideIcons.leaf,
-              size: AppSizes.iconMd,
-              color: AppColors.textOnAccent,
-            ),
+          const BillfernLogo(
+            size: AppSizes.brandMarkHeader,
+            excludeFromSemantics: true,
           ),
           const SizedBox(width: AppSpacing.xs),
           Flexible(

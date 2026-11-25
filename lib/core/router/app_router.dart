@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/onboarding/domain/onboarding_step.dart';
+import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
+import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/settings/presentation/screens/currency_preference_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/subscriptions/presentation/screens/add_subscription_screen.dart';
@@ -15,13 +18,39 @@ import 'app_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
-/// Application router. Exposed through Riverpod so redirects can later react
-/// to authentication and onboarding state.
+/// Application router. Exposed through Riverpod so redirects react to
+/// onboarding (and, later, authentication) state.
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Re-runs redirects when onboarding completes or is reset.
+  final onboardingDone = ValueNotifier<bool>(
+    ref.read(onboardingCompletedProvider),
+  );
+  ref.listen(
+    onboardingCompletedProvider,
+    (_, done) => onboardingDone.value = done,
+  );
+
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppDestination.home.path,
+    refreshListenable: onboardingDone,
+    redirect: (context, state) {
+      final inOnboarding = OnboardingStep.isOnboardingLocation(
+        state.matchedLocation,
+      );
+      if (!onboardingDone.value && !inOnboarding) {
+        return OnboardingStep.first.path;
+      }
+      if (onboardingDone.value && inOnboarding) {
+        return AppDestination.home.path;
+      }
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: OnboardingStep.welcome.path,
+        builder: (context, state) => const WelcomeScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -48,7 +77,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
-  ref.onDispose(router.dispose);
+  ref.onDispose(() {
+    router.dispose();
+    onboardingDone.dispose();
+  });
   return router;
 });
 

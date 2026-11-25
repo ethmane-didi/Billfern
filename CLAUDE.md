@@ -27,6 +27,7 @@ authentication, OpenAI, RevenueCat, payments, banking or exchange-rate APIs unti
 | 2.1 — Catalog and logos | 82-service catalog, 59 Simple Icons logos, `SubscriptionLogo` | ✅ Done |
 | 2.2 — Multi-currency | `Money`, conversion, display-currency preference | ✅ Done |
 | 3 — Subscription management | Subscriptions list, add (catalog or custom), details, edit, pause/resume, delete, local persistence | ✅ Done (awaiting review) |
+| 3.1 — Branding | Official logo (`BillfernLogo`), first-launch welcome, onboarding gate, Settings About | ✅ Done |
 | Later | Analytics screen, reminder notifications, Supabase sync, real exchange rates | ⏳ |
 
 Home is the dashboard (`DashboardScreen`). "+" opens the add flow, and renewal cards and
@@ -234,6 +235,32 @@ preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─
   it. Alphabetic symbols get a non-breaking space ("kr 199.00").
 - **Mock data** mixes USD, EUR (Figma) and NOK (Viaplay, Storytel). With an en_US
   device the dashboard shows ≈ $164.35/month.
+
+### Branding and onboarding
+
+- **Official logo:** `assets/branding/billfern_logo.png` (path in
+  `BrandAssets.logo`). It's 1254 × 1254 with transparent corners: the "B" mark and
+  wordmark on a dark rounded tile.
+  - Always render it with `BillfernLogo(size:)`. That keeps the aspect ratio,
+    decodes at display size to save memory, and falls back if the asset is
+    missing.
+  - **Never crop, recolour or edit it in code**, and never put it in
+    `assets/logos/`. That folder is for third-party service logos only.
+  - The launcher icon will use a separate symbol-only asset, not yet supplied.
+    Don't generate one from this logo.
+  - Used in: the welcome screen (168 px), the dashboard header
+    (`AppSizes.brandMarkHeader`) and the Settings About card
+    (`AppSizes.brandMarkAbout`).
+- **Onboarding** (`features/onboarding/`):
+  - `OnboardingStep` (currently just `welcome` at `/welcome`) and
+    `onboardingCompletedProvider` (persisted as `onboarding_completed`).
+  - The router redirects to `/welcome` until onboarding is complete, and away
+    from it afterwards (`refreshListenable`).
+  - `WelcomeScreen` offers "Get started" (personal mode) or "Explore with sample
+    data". Add future steps such as currency, reminders and account to
+    `OnboardingStep`.
+- **Tests:** `baseTestOverrides` plus `preferenceOverrides(mode:, onboarded:)`, or
+  `pumpBillfern(onboarded: false)` to test the welcome flow.
 
 ### Subscription catalog (separate from user subscriptions)
 

@@ -40,10 +40,11 @@ _setup({
   final personal = InMemorySubscriptionRepository(seed);
   final prefs = InMemoryAppPreferenceStore({
     PreferenceKeys.dataMode: mode.name,
+    PreferenceKeys.onboardingCompleted: 'true',
   });
   final container = ProviderContainer(
     overrides: [
-      ...emptyAppTestOverrides,
+      ...baseTestOverrides,
       personalSubscriptionRepositoryProvider.overrideWithValue(personal),
       appPreferenceStoreProvider.overrideWithValue(prefs),
     ],

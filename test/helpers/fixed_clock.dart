@@ -14,20 +14,35 @@ final List<Override> fixedClockOverrides = [
   clockProvider.overrideWithValue(() => fixedNow),
 ];
 
-/// Deterministic app environment for a first launch: fixed clock, an
-/// `en_US` device (display currency USD) and no subscriptions yet.
-final List<Override> emptyAppTestOverrides = [
+/// Fixed clock and an `en_US` device (display currency USD). Combine with
+/// [preferenceOverrides] (or override the preference store yourself).
+final List<Override> baseTestOverrides = [
   ...fixedClockOverrides,
   deviceLocaleProvider.overrideWithValue(const Locale('en', 'US')),
 ];
 
-/// [emptyAppTestOverrides] showing the mixed-currency **sample** data. A
-/// fresh in-memory preference store is created per container.
-final List<Override> appTestOverrides = [
-  ...emptyAppTestOverrides,
+/// A fresh in-memory settings store per container: [mode] data and,
+/// unless [onboarded] is false, onboarding already completed.
+List<Override> preferenceOverrides({
+  DataMode mode = DataMode.personal,
+  bool onboarded = true,
+}) => [
   appPreferenceStoreProvider.overrideWith(
     (ref) => InMemoryAppPreferenceStore({
-      PreferenceKeys.dataMode: DataMode.sample.name,
+      PreferenceKeys.dataMode: mode.name,
+      if (onboarded) PreferenceKeys.onboardingCompleted: 'true',
     }),
   ),
+];
+
+/// An onboarded user with no subscriptions yet.
+final List<Override> emptyAppTestOverrides = [
+  ...baseTestOverrides,
+  ...preferenceOverrides(),
+];
+
+/// An onboarded user viewing the mixed-currency **sample** data.
+final List<Override> appTestOverrides = [
+  ...baseTestOverrides,
+  ...preferenceOverrides(mode: DataMode.sample),
 ];
