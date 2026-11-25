@@ -1,0 +1,110 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/money/money.dart';
+import '../../../../shared/models/subscription.dart';
+import '../../../../shared/providers/clock_provider.dart';
+import '../../../../shared/providers/currency_providers.dart';
+import '../../../../shared/providers/subscription_providers.dart';
+import '../../domain/dashboard_models.dart';
+import '../../domain/savings_insight_engine.dart';
+import '../../domain/spending_calculator.dart';
+
+/// Number of months shown in the spending trend chart.
+const int dashboardHistoryMonths = 6;
+
+/// Renewals due within this many days count as "due soon" (notification dot).
+const int dueSoonDays = 3;
+
+/// Time-of-day greeting, e.g. "Good morning".
+final greetingProvider = Provider<String>((ref) {
+  final hour = ref.watch(clockProvider)().hour;
+  if (hour < 5) return 'Good evening';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+});
+
+/// Headline figures. Uses the full history (including removed
+/// subscriptions) so last month's total never changes after a deletion.
+final spendingSummaryProvider = Provider<SpendingSummary>((ref) {
+  return SpendingCalculator.summary(
+    ref.watch(subscriptionHistoryProvider),
+    ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
+  );
+});
+
+final spendingHistoryProvider = Provider<List<MonthlySpend>>((ref) {
+  return SpendingCalculator.monthlyHistory(
+    ref.watch(subscriptionHistoryProvider),
+    ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
+    months: dashboardHistoryMonths,
+  );
+});
+
+final categoryBreakdownProvider = Provider<List<CategorySpend>>((ref) {
+  return SpendingCalculator.categoryBreakdown(
+    ref.watch(subscriptionsProvider),
+    ref.watch(moneyConverterProvider),
+  );
+});
+
+final upcomingRenewalsProvider = Provider<List<UpcomingRenewal>>((ref) {
+  return SpendingCalculator.upcomingRenewals(
+    ref.watch(subscriptionsProvider),
+    ref.watch(todayProvider),
+    ref.watch(moneyConverterProvider),
+  );
+});
+
+/// Renewals due within [dueSoonDays].
+final dueSoonRenewalsProvider = Provider<List<UpcomingRenewal>>((ref) {
+  return [
+    for (final renewal in ref.watch(upcomingRenewalsProvider))
+      if (renewal.daysUntil <= dueSoonDays) renewal,
+  ];
+});
+
+/// Total of every projected payment in the next seven days, in the display
+/// currency (the same projection as Analytics' upcoming payments). Payments
+/// without an exchange rate are left out.
+final dueThisWeekProvider = Provider<Money>((ref) {
+  return SpendingCalculator.convertedSum(
+    SpendingCalculator.projectedPayments(
+      ref.watch(subscriptionsProvider),
+      ref.watch(todayProvider),
+      ref.watch(moneyConverterProvider),
+      withinDays: 7,
+    ).map((payment) => payment.subscription),
+    (sub) => sub.price,
+    ref.watch(moneyConverterProvider),
+  ).total;
+});
+
+/// Number of rows in the dashboard's "Recently added" list.
+const int recentlyAddedCount = 4;
+
+/// Most recently added subscriptions, newest first.
+final recentlyAddedSubscriptionsProvider = Provider<List<Subscription>>((ref) {
+  final subs = [...ref.watch(subscriptionsProvider)]
+    ..sort((a, b) {
+      final byDate = b.addedOn.compareTo(a.addedOn);
+      return byDate != 0 ? byDate : a.name.compareTo(b.name);
+    });
+  return List.unmodifiable(subs.take(recentlyAddedCount));
+});
+
+/// Mock engine today; swap for the OpenAI-backed engine later.
+final savingsInsightEngineProvider = Provider<SavingsInsightEngine>(
+  (ref) => const MockSavingsInsightEngine(),
+);
+
+final savingsInsightProvider = Provider<SavingsInsight?>((ref) {
+  return ref
+      .watch(savingsInsightEngineProvider)
+      .topInsight(
+        ref.watch(subscriptionsProvider),
+        ref.watch(moneyConverterProvider),
+      );
+});

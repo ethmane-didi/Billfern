@@ -1,0 +1,1076 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "id": "netflix",
+      "name": "Netflix",
+      "domain": "netflix.com",
+      "category": "entertainment",
+      "brandColor": "#E50914",
+      "logo": "assets/logos/netflix.svg",
+      "aliases": [],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "disney-plus",
+      "name": "Disney+",
+      "domain": "disneyplus.com",
+      "category": "entertainment",
+      "brandColor": "#113CCF",
+      "logo": null,
+      "aliases": [
+        "disney plus",
+        "disney"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "hbo-max",
+      "name": "HBO Max",
+      "domain": "hbomax.com",
+      "category": "entertainment",
+      "brandColor": "#000000",
+      "logo": "assets/logos/hbo-max.svg",
+      "aliases": [
+        "max",
+        "hbo"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "prime-video",
+      "name": "Amazon Prime Video",
+      "domain": "primevideo.com",
+      "category": "entertainment",
+      "brandColor": "#00A8E1",
+      "logo": null,
+      "aliases": [
+        "prime video",
+        "amazon prime",
+        "prime"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "apple-tv-plus",
+      "name": "Apple TV+",
+      "domain": "tv.apple.com",
+      "category": "entertainment",
+      "brandColor": "#000000",
+      "logo": "assets/logos/apple-tv-plus.svg",
+      "aliases": [
+        "apple tv plus",
+        "apple tv"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "hulu",
+      "name": "Hulu",
+      "domain": "hulu.com",
+      "category": "entertainment",
+      "brandColor": "#1CE783",
+      "logo": null,
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "paramount-plus",
+      "name": "Paramount+",
+      "domain": "paramountplus.com",
+      "category": "entertainment",
+      "brandColor": "#0064FF",
+      "logo": "assets/logos/paramount-plus.svg",
+      "aliases": [
+        "paramount plus",
+        "paramount"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "peacock",
+      "name": "Peacock",
+      "domain": "peacocktv.com",
+      "category": "entertainment",
+      "brandColor": "#000000",
+      "logo": null,
+      "aliases": [
+        "peacock tv"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "youtube-premium",
+      "name": "YouTube Premium",
+      "domain": "youtube.com",
+      "category": "entertainment",
+      "brandColor": "#FF0000",
+      "logo": "assets/logos/youtube-premium.svg",
+      "aliases": [
+        "youtube",
+        "yt premium"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "crunchyroll",
+      "name": "Crunchyroll",
+      "domain": "crunchyroll.com",
+      "category": "entertainment",
+      "brandColor": "#FF5E00",
+      "logo": "assets/logos/crunchyroll.svg",
+      "aliases": [
+        "anime"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "viaplay",
+      "name": "Viaplay",
+      "domain": "viaplay.com",
+      "category": "entertainment",
+      "brandColor": "#FE365F",
+      "logo": "assets/logos/viaplay.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": [
+        "nordic"
+      ]
+    },
+    {
+      "id": "tv2-play",
+      "name": "TV 2 Play",
+      "domain": "play.tv2.no",
+      "category": "entertainment",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "tv2",
+        "tv 2",
+        "tv2 play"
+      ],
+      "popular": false,
+      "regions": [
+        "nordic"
+      ]
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "domain": "spotify.com",
+      "category": "music",
+      "brandColor": "#1ED760",
+      "logo": "assets/logos/spotify.svg",
+      "aliases": [],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "apple-music",
+      "name": "Apple Music",
+      "domain": "music.apple.com",
+      "category": "music",
+      "brandColor": "#FA243C",
+      "logo": "assets/logos/apple-music.svg",
+      "aliases": [
+        "itunes"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "youtube-music",
+      "name": "YouTube Music",
+      "domain": "music.youtube.com",
+      "category": "music",
+      "brandColor": "#FF0000",
+      "logo": "assets/logos/youtube-music.svg",
+      "aliases": [
+        "yt music"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "tidal",
+      "name": "TIDAL",
+      "domain": "tidal.com",
+      "category": "music",
+      "brandColor": "#000000",
+      "logo": "assets/logos/tidal.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "deezer",
+      "name": "Deezer",
+      "domain": "deezer.com",
+      "category": "music",
+      "brandColor": "#A238FF",
+      "logo": "assets/logos/deezer.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "soundcloud",
+      "name": "SoundCloud",
+      "domain": "soundcloud.com",
+      "category": "music",
+      "brandColor": "#FF5500",
+      "logo": "assets/logos/soundcloud.svg",
+      "aliases": [
+        "soundcloud go"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "domain": "chatgpt.com",
+      "category": "aiTools",
+      "brandColor": "#10A37F",
+      "logo": null,
+      "aliases": [
+        "openai",
+        "gpt",
+        "chat gpt"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "domain": "claude.ai",
+      "category": "aiTools",
+      "brandColor": "#D97757",
+      "logo": "assets/logos/claude.svg",
+      "aliases": [
+        "anthropic"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "domain": "gemini.google.com",
+      "category": "aiTools",
+      "brandColor": "#8E75B2",
+      "logo": "assets/logos/gemini.svg",
+      "aliases": [
+        "gemini",
+        "bard",
+        "google ai"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "domain": "perplexity.ai",
+      "category": "aiTools",
+      "brandColor": "#1FB8CD",
+      "logo": "assets/logos/perplexity.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "midjourney",
+      "name": "Midjourney",
+      "domain": "midjourney.com",
+      "category": "aiTools",
+      "brandColor": "#000000",
+      "logo": null,
+      "aliases": [
+        "mj"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "domain": "cursor.com",
+      "category": "aiTools",
+      "brandColor": "#000000",
+      "logo": "assets/logos/cursor.svg",
+      "aliases": [
+        "cursor ai"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "domain": "github.com/features/copilot",
+      "category": "aiTools",
+      "brandColor": "#000000",
+      "logo": "assets/logos/github-copilot.svg",
+      "aliases": [
+        "copilot"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral Le Chat",
+      "domain": "mistral.ai",
+      "category": "aiTools",
+      "brandColor": "#FA520F",
+      "logo": "assets/logos/mistral.svg",
+      "aliases": [
+        "le chat",
+        "mistral"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "domain": "figma.com",
+      "category": "design",
+      "brandColor": "#F24E1E",
+      "logo": "assets/logos/figma.svg",
+      "aliases": [],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "domain": "canva.com",
+      "category": "design",
+      "brandColor": "#00C4CC",
+      "logo": null,
+      "aliases": [],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "adobe-creative-cloud",
+      "name": "Adobe Creative Cloud",
+      "domain": "adobe.com",
+      "category": "design",
+      "brandColor": "#DA1F26",
+      "logo": null,
+      "aliases": [
+        "adobe",
+        "creative cloud",
+        "photoshop",
+        "illustrator"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "adobe-lightroom",
+      "name": "Adobe Lightroom",
+      "domain": "lightroom.adobe.com",
+      "category": "design",
+      "brandColor": "#31A8FF",
+      "logo": null,
+      "aliases": [
+        "lightroom",
+        "adobe photography"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "sketch",
+      "name": "Sketch",
+      "domain": "sketch.com",
+      "category": "design",
+      "brandColor": "#F7B500",
+      "logo": "assets/logos/sketch.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "framer",
+      "name": "Framer",
+      "domain": "framer.com",
+      "category": "design",
+      "brandColor": "#0055FF",
+      "logo": "assets/logos/framer.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "domain": "notion.so",
+      "category": "productivity",
+      "brandColor": "#000000",
+      "logo": "assets/logos/notion.svg",
+      "aliases": [
+        "notion ai"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "microsoft-365",
+      "name": "Microsoft 365",
+      "domain": "microsoft.com/microsoft-365",
+      "category": "productivity",
+      "brandColor": "#D83B01",
+      "logo": null,
+      "aliases": [
+        "office 365",
+        "office",
+        "word",
+        "excel",
+        "m365"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "google-workspace",
+      "name": "Google Workspace",
+      "domain": "workspace.google.com",
+      "category": "productivity",
+      "brandColor": "#4285F4",
+      "logo": null,
+      "aliases": [
+        "g suite",
+        "gsuite",
+        "gmail business"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "todoist",
+      "name": "Todoist",
+      "domain": "todoist.com",
+      "category": "productivity",
+      "brandColor": "#E44332",
+      "logo": "assets/logos/todoist.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "grammarly",
+      "name": "Grammarly",
+      "domain": "grammarly.com",
+      "category": "productivity",
+      "brandColor": "#027E6F",
+      "logo": "assets/logos/grammarly.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "domain": "slack.com",
+      "category": "productivity",
+      "brandColor": "#4A154B",
+      "logo": null,
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "evernote",
+      "name": "Evernote",
+      "domain": "evernote.com",
+      "category": "productivity",
+      "brandColor": "#00A82D",
+      "logo": "assets/logos/evernote.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "domain": "obsidian.md",
+      "category": "productivity",
+      "brandColor": "#7C3AED",
+      "logo": "assets/logos/obsidian.svg",
+      "aliases": [
+        "obsidian sync"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "domain": "linear.app",
+      "category": "productivity",
+      "brandColor": "#5E6AD2",
+      "logo": "assets/logos/linear.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "asana",
+      "name": "Asana",
+      "domain": "asana.com",
+      "category": "productivity",
+      "brandColor": "#F06A6A",
+      "logo": "assets/logos/asana.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "icloud-plus",
+      "name": "iCloud+",
+      "domain": "icloud.com",
+      "category": "cloudStorage",
+      "brandColor": "#3693F3",
+      "logo": "assets/logos/icloud-plus.svg",
+      "aliases": [
+        "icloud",
+        "icloud plus",
+        "apple storage"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "google-one",
+      "name": "Google One",
+      "domain": "one.google.com",
+      "category": "cloudStorage",
+      "brandColor": "#4285F4",
+      "logo": null,
+      "aliases": [
+        "google drive storage",
+        "google storage"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "domain": "dropbox.com",
+      "category": "cloudStorage",
+      "brandColor": "#0061FF",
+      "logo": "assets/logos/dropbox.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "onedrive",
+      "name": "OneDrive",
+      "domain": "onedrive.live.com",
+      "category": "cloudStorage",
+      "brandColor": "#0078D4",
+      "logo": null,
+      "aliases": [
+        "microsoft onedrive"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "proton-drive",
+      "name": "Proton Drive",
+      "domain": "proton.me/drive",
+      "category": "cloudStorage",
+      "brandColor": "#EB508D",
+      "logo": "assets/logos/proton-drive.svg",
+      "aliases": [
+        "proton"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "domain": "github.com",
+      "category": "development",
+      "brandColor": "#181717",
+      "logo": "assets/logos/github.svg",
+      "aliases": [
+        "github pro",
+        "github team"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "domain": "vercel.com",
+      "category": "development",
+      "brandColor": "#000000",
+      "logo": "assets/logos/vercel.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "domain": "netlify.com",
+      "category": "development",
+      "brandColor": "#000000",
+      "logo": "assets/logos/netlify.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "domain": "supabase.com",
+      "category": "development",
+      "brandColor": "#3FCF8E",
+      "logo": "assets/logos/supabase.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "digitalocean",
+      "name": "DigitalOcean",
+      "domain": "digitalocean.com",
+      "category": "development",
+      "brandColor": "#0080FF",
+      "logo": "assets/logos/digitalocean.svg",
+      "aliases": [
+        "digital ocean",
+        "do"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "replit",
+      "name": "Replit",
+      "domain": "replit.com",
+      "category": "development",
+      "brandColor": "#F26207",
+      "logo": "assets/logos/replit.svg",
+      "aliases": [
+        "repl.it"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "jetbrains",
+      "name": "JetBrains",
+      "domain": "jetbrains.com",
+      "category": "development",
+      "brandColor": "#000000",
+      "logo": "assets/logos/jetbrains.svg",
+      "aliases": [
+        "intellij",
+        "webstorm",
+        "pycharm"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "xbox-game-pass",
+      "name": "Xbox Game Pass",
+      "domain": "xbox.com",
+      "category": "gaming",
+      "brandColor": "#107C10",
+      "logo": null,
+      "aliases": [
+        "game pass",
+        "xbox"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "playstation-plus",
+      "name": "PlayStation Plus",
+      "domain": "playstation.com",
+      "category": "gaming",
+      "brandColor": "#0070D1",
+      "logo": "assets/logos/playstation-plus.svg",
+      "aliases": [
+        "ps plus",
+        "psn",
+        "playstation"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "nintendo-switch-online",
+      "name": "Nintendo Switch Online",
+      "domain": "nintendo.com",
+      "category": "gaming",
+      "brandColor": "#E60012",
+      "logo": null,
+      "aliases": [
+        "nintendo",
+        "switch online"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "ea-play",
+      "name": "EA Play",
+      "domain": "ea.com",
+      "category": "gaming",
+      "brandColor": "#000000",
+      "logo": "assets/logos/ea-play.svg",
+      "aliases": [
+        "ea",
+        "electronic arts"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "ubisoft-plus",
+      "name": "Ubisoft+",
+      "domain": "ubisoft.com",
+      "category": "gaming",
+      "brandColor": "#000000",
+      "logo": "assets/logos/ubisoft-plus.svg",
+      "aliases": [
+        "ubisoft plus",
+        "ubisoft"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "apple-arcade",
+      "name": "Apple Arcade",
+      "domain": "apple.com/apple-arcade",
+      "category": "gaming",
+      "brandColor": "#000000",
+      "logo": "assets/logos/apple-arcade.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "strava",
+      "name": "Strava",
+      "domain": "strava.com",
+      "category": "health",
+      "brandColor": "#FC4C02",
+      "logo": "assets/logos/strava.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "headspace",
+      "name": "Headspace",
+      "domain": "headspace.com",
+      "category": "health",
+      "brandColor": "#F47D31",
+      "logo": "assets/logos/headspace.svg",
+      "aliases": [
+        "meditation"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "calm",
+      "name": "Calm",
+      "domain": "calm.com",
+      "category": "health",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "meditation",
+        "sleep"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "myfitnesspal",
+      "name": "MyFitnessPal",
+      "domain": "myfitnesspal.com",
+      "category": "health",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "mfp",
+        "calorie counter"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "fitbit-premium",
+      "name": "Fitbit Premium",
+      "domain": "fitbit.com",
+      "category": "health",
+      "brandColor": "#00B0B9",
+      "logo": "assets/logos/fitbit-premium.svg",
+      "aliases": [
+        "fitbit"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "peloton",
+      "name": "Peloton",
+      "domain": "onepeloton.com",
+      "category": "health",
+      "brandColor": "#181A1D",
+      "logo": "assets/logos/peloton.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "sats",
+      "name": "SATS",
+      "domain": "sats.no",
+      "category": "health",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "gym",
+        "treningssenter"
+      ],
+      "popular": false,
+      "regions": [
+        "nordic"
+      ]
+    },
+    {
+      "id": "duolingo",
+      "name": "Duolingo",
+      "domain": "duolingo.com",
+      "category": "learning",
+      "brandColor": "#58CC02",
+      "logo": "assets/logos/duolingo.svg",
+      "aliases": [
+        "duolingo super",
+        "duolingo max"
+      ],
+      "popular": true,
+      "regions": []
+    },
+    {
+      "id": "coursera",
+      "name": "Coursera",
+      "domain": "coursera.org",
+      "category": "learning",
+      "brandColor": "#0056D2",
+      "logo": "assets/logos/coursera.svg",
+      "aliases": [
+        "coursera plus"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "skillshare",
+      "name": "Skillshare",
+      "domain": "skillshare.com",
+      "category": "learning",
+      "brandColor": "#00FF84",
+      "logo": "assets/logos/skillshare.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "masterclass",
+      "name": "MasterClass",
+      "domain": "masterclass.com",
+      "category": "learning",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "master class"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "udemy",
+      "name": "Udemy",
+      "domain": "udemy.com",
+      "category": "learning",
+      "brandColor": "#A435F0",
+      "logo": "assets/logos/udemy.svg",
+      "aliases": [
+        "udemy personal plan"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "nordvpn",
+      "name": "NordVPN",
+      "domain": "nordvpn.com",
+      "category": "security",
+      "brandColor": "#4687FF",
+      "logo": "assets/logos/nordvpn.svg",
+      "aliases": [
+        "nord vpn",
+        "nord"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "expressvpn",
+      "name": "ExpressVPN",
+      "domain": "expressvpn.com",
+      "category": "security",
+      "brandColor": "#DA3940",
+      "logo": "assets/logos/expressvpn.svg",
+      "aliases": [
+        "express vpn"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "proton-vpn",
+      "name": "Proton VPN",
+      "domain": "protonvpn.com",
+      "category": "security",
+      "brandColor": "#66DEB1",
+      "logo": "assets/logos/proton-vpn.svg",
+      "aliases": [
+        "protonvpn",
+        "proton"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "1password",
+      "name": "1Password",
+      "domain": "1password.com",
+      "category": "security",
+      "brandColor": "#145FE4",
+      "logo": "assets/logos/1password.svg",
+      "aliases": [
+        "one password",
+        "password manager"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "bitwarden",
+      "name": "Bitwarden",
+      "domain": "bitwarden.com",
+      "category": "security",
+      "brandColor": "#175DDC",
+      "logo": "assets/logos/bitwarden.svg",
+      "aliases": [
+        "password manager"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "surfshark",
+      "name": "Surfshark",
+      "domain": "surfshark.com",
+      "category": "security",
+      "brandColor": "#1EBFBF",
+      "logo": "assets/logos/surfshark.svg",
+      "aliases": [],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "storytel",
+      "name": "Storytel",
+      "domain": "storytel.com",
+      "category": "reading",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "audiobooks",
+        "lydbok"
+      ],
+      "popular": false,
+      "regions": [
+        "nordic"
+      ]
+    },
+    {
+      "id": "audible",
+      "name": "Audible",
+      "domain": "audible.com",
+      "category": "reading",
+      "brandColor": "#F8991C",
+      "logo": "assets/logos/audible.svg",
+      "aliases": [
+        "audiobooks",
+        "amazon audible"
+      ],
+      "popular": false,
+      "regions": []
+    },
+    {
+      "id": "podme",
+      "name": "Podme",
+      "domain": "podme.com",
+      "category": "reading",
+      "brandColor": null,
+      "logo": null,
+      "aliases": [
+        "podcasts",
+        "podme premium"
+      ],
+      "popular": false,
+      "regions": [
+        "nordic"
+      ]
+    },
+    {
+      "id": "substack",
+      "name": "Substack",
+      "domain": "substack.com",
+      "category": "reading",
+      "brandColor": "#FF6719",
+      "logo": "assets/logos/substack.svg",
+      "aliases": [
+        "newsletter"
+      ],
+      "popular": false,
+      "regions": []
+    }
+  ]
+}
