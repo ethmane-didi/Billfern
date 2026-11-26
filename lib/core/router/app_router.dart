@@ -2,6 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account/presentation/screens/import_guest_data_screen.dart';
+import '../../features/account/presentation/screens/sign_in_screen.dart';
+import '../../features/account/presentation/screens/verify_email_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/onboarding/domain/onboarding_step.dart';
@@ -35,10 +38,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: AppDestination.home.path,
     refreshListenable: onboardingDone,
     redirect: (context, state) {
-      final inOnboarding = OnboardingStep.isOnboardingLocation(
-        state.matchedLocation,
-      );
-      if (!onboardingDone.value && !inOnboarding) {
+      final location = state.matchedLocation;
+      final inOnboarding = OnboardingStep.isOnboardingLocation(location);
+      // Account screens are reachable from the welcome screen too.
+      final inAccountFlow = location.startsWith(AppRoutes.accountPrefix);
+      if (!onboardingDone.value && !inOnboarding && !inAccountFlow) {
         return OnboardingStep.first.path;
       }
       if (onboardingDone.value && inOnboarding) {
@@ -51,6 +55,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: OnboardingStep.welcome.path,
         builder: (context, state) => const WelcomeScreen(),
       ),
+      ..._accountRoutes,
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -124,8 +129,54 @@ final List<RouteBase> _subscriptionRoutes = [
   ),
 ];
 
+/// Optional account screens, full-screen above the shell.
+final List<RouteBase> _accountRoutes = [
+  GoRoute(
+    path: AppRoutes.signInPath,
+    parentNavigatorKey: _rootNavigatorKey,
+    builder: (context, state) => SignInScreen(
+      createAccount: state.uri.queryParameters['mode'] == 'create',
+      returnTo: _safeReturn(state.uri.queryParameters['return']),
+    ),
+  ),
+  GoRoute(
+    path: AppRoutes.verifyEmail,
+    parentNavigatorKey: _rootNavigatorKey,
+    redirect: (context, state) =>
+        state.extra is VerifyEmailArgs ? null : AppRoutes.signInPath,
+    builder: (context, state) =>
+        VerifyEmailScreen(args: state.extra! as VerifyEmailArgs),
+  ),
+  GoRoute(
+    path: AppRoutes.importGuestData,
+    parentNavigatorKey: _rootNavigatorKey,
+    builder: (context, state) => const ImportGuestDataScreen(),
+  ),
+];
+
+/// Only in-app paths are accepted as a return location.
+String? _safeReturn(String? value) =>
+    value != null && value.startsWith('/') && !value.startsWith('//')
+    ? value
+    : null;
+
 /// Paths of routes nested under the top-level destinations.
 abstract final class AppRoutes {
+  static const String accountPrefix = '/account';
+  static const String signInPath = '/account/sign-in';
+
+  /// Code entry after requesting an email code (needs `VerifyEmailArgs`).
+  static const String verifyEmail = '/account/verify';
+
+  /// Consent to upload subscriptions tracked before signing in.
+  static const String importGuestData = '/account/import';
+
+  /// Sign-in screen; [createAccount] starts in "create account" mode.
+  static String signIn({bool createAccount = false, String? returnTo}) => Uri(
+    path: signInPath,
+    queryParameters: {if (createAccount) 'mode': 'create', 'return': ?returnTo},
+  ).toString();
+
   static const String currencySegment = 'currency';
   static const String currencyName = 'currencyPreference';
 

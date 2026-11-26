@@ -2,15 +2,20 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/billfern_logo.dart';
 import '../../../../shared/widgets/buttons/primary_button.dart';
 import '../../../../shared/widgets/buttons/secondary_button.dart';
 import '../../../../shared/widgets/fade_slide_in.dart';
 import '../../../../shared/widgets/gradient_scaffold.dart';
+import '../../../account/domain/auth_models.dart';
+import '../../../account/presentation/providers/account_providers.dart';
+import '../../../account/presentation/widgets/account_scaffold.dart';
 import '../providers/onboarding_providers.dart';
 
 /// First-launch welcome: the Billfern logo, what the app does, and a choice
@@ -23,6 +28,8 @@ class WelcomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onboarding = ref.read(onboardingCompletedProvider.notifier);
+    final accountsAvailable =
+        ref.watch(authControllerProvider) is! AuthUnavailable;
 
     return GradientScaffold(
       body: SafeArea(
@@ -91,6 +98,13 @@ class WelcomeScreen extends ConsumerWidget {
                             onPressed: () =>
                                 onboarding.finish(withSampleData: true),
                           ),
+                          if (accountsAvailable)
+                            LinkButton(
+                              label: 'Sign in or create an account',
+                              onPressed: () => context.push(
+                                AppRoutes.signIn(createAccount: true),
+                              ),
+                            ),
                           const SizedBox(height: AppSpacing.md),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -103,7 +117,8 @@ class WelcomeScreen extends ConsumerWidget {
                               const SizedBox(width: AppSpacing.xxs),
                               Flexible(
                                 child: Text(
-                                  'Your data stays on this device.',
+                                  'Your data stays on this device unless you '
+                                  'turn on cloud sync.',
                                   style: AppTypography.caption,
                                 ),
                               ),

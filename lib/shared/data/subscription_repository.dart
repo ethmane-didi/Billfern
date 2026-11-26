@@ -67,24 +67,52 @@ class DemoSubscriptionRepository extends InMemorySubscriptionRepository {
     : super(buildMockSubscriptions(today));
 }
 
+/// Records local changes for cloud synchronization, inside the same
+/// sembast transaction as the change itself (so a crash can never leave a
+/// saved change without its pending sync operation, or the reverse).
+abstract interface class SubscriptionChangeRecorder {
+  Future<void> recordUpsert(DatabaseClient txn, Subscription subscription);
+  Future<void> recordDelete(DatabaseClient txn, String id);
+}
+
 /// Device-local repository backed by a sembast database: one record per
 /// subscription in the `subscriptions` store, keyed by id.
+///
+/// Each identity (guest, or each signed-in account) has its own database
+/// file, so data never leaks between accounts. Account databases pass a
+/// [SubscriptionChangeRecorder] so every local change also enqueues a
+/// pending sync operation atomically.
 class SembastSubscriptionRepository implements SubscriptionRepository {
-  SembastSubscriptionRepository._(this._database, this._cache);
+  SembastSubscriptionRepository._(this._database, this._cache, this._recorder);
 
   static final StoreRef<String, Map<String, Object?>> store =
       stringMapStoreFactory.store('subscriptions');
 
   final Database _database;
   final Map<String, Subscription> _cache;
+  final SubscriptionChangeRecorder? _recorder;
+
+  /// The database this repository reads and writes.
+  Database get database => _database;
 
   /// Records that could not be decoded (kept on disk, skipped in the app).
   @visibleForTesting
   int skippedRecords = 0;
 
   /// Loads all records into memory.
-  static Future<SembastSubscriptionRepository> open(Database database) async {
-    final records = await store.find(database);
+  static Future<SembastSubscriptionRepository> open(
+    Database database, {
+    SubscriptionChangeRecorder? recorder,
+  }) async {
+    final (cache, skipped) = await _load(database);
+    return SembastSubscriptionRepository._(database, cache, recorder)
+      ..skippedRecords = skipped;
+  }
+
+  static Future<(Map<String, Subscription>, int)> _load(
+    DatabaseClient client,
+  ) async {
+    final records = await store.find(client);
     final cache = <String, Subscription>{};
     var skipped = 0;
     for (final record in records) {
@@ -95,8 +123,7 @@ class SembastSubscriptionRepository implements SubscriptionRepository {
         skipped++;
       }
     }
-    return SembastSubscriptionRepository._(database, cache)
-      ..skippedRecords = skipped;
+    return (cache, skipped);
   }
 
   @override
@@ -107,17 +134,79 @@ class SembastSubscriptionRepository implements SubscriptionRepository {
   List<Subscription> fetchEnded() =>
       List.unmodifiable(_cache.values.where((sub) => sub.isEnded));
 
+  /// Every stored subscription, current and ended.
+  List<Subscription> fetchEverything() => List.unmodifiable(_cache.values);
+
+  /// The stored subscription with [id], current or ended.
+  Subscription? find(String id) => _cache[id];
+
   @override
   Future<void> save(Subscription subscription) async {
-    await store
-        .record(subscription.id)
-        .put(_database, SubscriptionCodec.toMap(subscription));
+    await _database.transaction((txn) async {
+      await store
+          .record(subscription.id)
+          .put(txn, SubscriptionCodec.toMap(subscription));
+      await _recorder?.recordUpsert(txn, subscription);
+    });
     _cache[subscription.id] = subscription;
   }
 
   @override
   Future<void> delete(String id) async {
-    await store.record(id).delete(_database);
+    await _database.transaction((txn) async {
+      await store.record(id).delete(txn);
+      await _recorder?.recordDelete(txn, id);
+    });
     _cache.remove(id);
+  }
+
+  /// Applies changes that came **from** the cloud: no sync operations are
+  /// recorded. [extra] runs in the same transaction (e.g. to store record
+  /// versions and the pull cursor), so either everything is applied or
+  /// nothing is.
+  Future<void> applyRemote({
+    Iterable<Subscription> upserts = const [],
+    Iterable<String> deletes = const [],
+    Future<void> Function(Transaction txn)? extra,
+  }) async {
+    final upsertList = upserts.toList();
+    final deleteList = deletes.toList();
+    await _database.transaction((txn) async {
+      for (final subscription in upsertList) {
+        await store
+            .record(subscription.id)
+            .put(txn, SubscriptionCodec.toMap(subscription));
+      }
+      for (final id in deleteList) {
+        await store.record(id).delete(txn);
+      }
+      await extra?.call(txn);
+    });
+    for (final subscription in upsertList) {
+      _cache[subscription.id] = subscription;
+    }
+    deleteList.forEach(_cache.remove);
+  }
+
+  /// Saves [subscription] and runs [extra] in one transaction, recording a
+  /// sync operation like [save] (used by the guest-data migration).
+  Future<void> saveWith(
+    Subscription subscription,
+    Future<void> Function(Transaction txn) extra,
+  ) async {
+    await _database.transaction((txn) async {
+      await store
+          .record(subscription.id)
+          .put(txn, SubscriptionCodec.toMap(subscription));
+      await _recorder?.recordUpsert(txn, subscription);
+      await extra(txn);
+    });
+    _cache[subscription.id] = subscription;
+  }
+
+  /// Removes every subscription (explicit local-data reset).
+  Future<void> clearAll() async {
+    await store.delete(_database);
+    _cache.clear();
   }
 }

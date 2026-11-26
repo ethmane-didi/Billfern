@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/money/currency.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../account/presentation/widgets/account_sync_section.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/providers/currency_providers.dart';
 import '../../../../shared/widgets/app_card.dart';
@@ -51,12 +52,20 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
+          Text('ACCOUNT & SYNC', style: AppTypography.labelSmall),
+          const SizedBox(height: AppSpacing.xs),
+          const AccountSyncSection(),
+          const SizedBox(height: AppSpacing.xl),
+          Text('PRIVACY', style: AppTypography.labelSmall),
+          const SizedBox(height: AppSpacing.xs),
+          const LocalDataSection(),
+          const SizedBox(height: AppSpacing.xl),
           Text('ABOUT', style: AppTypography.labelSmall),
           const SizedBox(height: AppSpacing.xs),
           const _AboutCard(),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Reminders, account and premium plans are coming soon.',
+            'Reminders and premium plans are coming soon.',
             textAlign: TextAlign.center,
             style: AppTypography.bodySmall,
           ),
@@ -175,7 +184,8 @@ class _AboutCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Text(
             'Track every subscription, see what renews next and what you '
-            'spend each month. Your data is stored on this device.',
+            'spend each month. Your data is stored on this device, and in '
+            'your account only if you turn on cloud sync.',
             style: AppTypography.bodySmall,
           ),
           const SizedBox(height: AppSpacing.sm),

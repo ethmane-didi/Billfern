@@ -1,0 +1,8 @@
+# Supabase CLI configuration (local development and deployment settings).
+# Run `supabase link --project-ref <dev-project-ref>` before `supabase db push`.
+project_id = "billfern"
+
+[functions.delete-account]
+# The gateway rejects requests without a valid user JWT; the function also
+# validates the token itself before deleting anything.
+verify_jwt = true

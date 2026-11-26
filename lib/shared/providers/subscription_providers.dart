@@ -1,12 +1,12 @@
-import 'dart:math';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_math.dart';
+import '../../core/utils/uuid.dart';
 import '../data/app_preference_store.dart';
 import '../data/subscription_repository.dart';
 import '../models/subscription.dart';
 import 'clock_provider.dart';
+import 'local_store_providers.dart';
 
 /// Whose data the app shows.
 enum DataMode {
@@ -47,10 +47,13 @@ final dataModeProvider = NotifierProvider<DataModeNotifier, DataMode>(
   DataModeNotifier.new,
 );
 
-/// The user's own subscriptions. `main` overrides this with the sembast
-/// repository; the in-memory default keeps tests hermetic.
+/// The user's own subscriptions: the active identity's sembast database
+/// (guest or signed-in account). Without a local store (widget tests) an
+/// in-memory repository keeps tests hermetic.
 final personalSubscriptionRepositoryProvider = Provider<SubscriptionRepository>(
-  (ref) => InMemorySubscriptionRepository(),
+  (ref) =>
+      ref.watch(activeLocalStoreProvider)?.subscriptions ??
+      InMemorySubscriptionRepository(),
 );
 
 /// Sample subscriptions, built relative to today.
@@ -66,16 +69,12 @@ final subscriptionRepositoryProvider = Provider<SubscriptionRepository>(
   },
 );
 
-/// Generates unique subscription ids. Override in tests for stable ids.
-final subscriptionIdGeneratorProvider = Provider<String Function()>((ref) {
-  final random = Random();
-  final now = ref.watch(clockProvider);
-  return () {
-    final time = now().microsecondsSinceEpoch.toRadixString(36);
-    final noise = random.nextInt(1 << 32).toRadixString(36).padLeft(7, '0');
-    return 'sub_${time}_$noise';
-  };
-});
+/// Generates unique subscription ids: random UUID v4, so ids stay unique
+/// across devices and accounts (older `sub_…` ids remain valid). Override
+/// in tests for stable ids.
+final subscriptionIdGeneratorProvider = Provider<String Function()>(
+  (ref) => Uuid.v4,
+);
 
 /// Every tracked subscription, de-duplicated by id (first occurrence wins),
 /// plus the mutations the app performs on them.
@@ -97,6 +96,10 @@ class SubscriptionsNotifier extends Notifier<List<Subscription>> {
   }
 
   void _refresh() => state = _dedupe(_repository.fetchAll());
+
+  /// Re-reads the repository after changes made outside this notifier
+  /// (e.g. remote changes applied by synchronization).
+  void reload() => _refresh();
 
   /// Adds the user's own subscription. Adding from sample mode switches to
   /// personal mode first, so sample data is never mixed with real data.

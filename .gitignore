@@ -46,3 +46,14 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Supabase: local build configuration (copy config/supabase.example.json).
+# Contains only the public URL and publishable key, but stays out of Git so
+# each developer points at their own development project.
+/config/supabase.json
+/config/*.local.json
+# Supabase CLI state
+/supabase/.temp/
+/supabase/.branches/
+/supabase/.env
+/supabase/functions/.env

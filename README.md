@@ -8,8 +8,10 @@ find subscriptions they no longer need, and save money.
 
 > **Status:** early development. Users can manage their own subscriptions (add from an
 > 82-service catalog or create custom ones, edit, pause, resume and delete), stored locally
-> on the device, and explore spending analytics. Exchange rates are development mock
-> rates and savings suggestions are local rules, not AI. There is no backend yet.
+> on the device, and explore spending analytics. An optional account adds cloud backup
+> and sync through Supabase. Billfern works fully offline and without an account.
+> Exchange rates are development mock rates, and savings suggestions are local rules,
+> not AI.
 
 ## Dashboard
 
@@ -123,6 +125,177 @@ Billfern never invents history:
   yet.
 - Paused subscriptions are not projected, even if you plan to resume them.
 
+## Accounts and cloud sync (optional)
+
+Billfern never requires an account. Everything works offline on the device, and an
+account only adds backup and sync across devices.
+
+- **Sign-in:** an email one-time code. You enter your email, then type or paste the
+  verification code from the email (Billfern accepts 6 to 10 digits; the Supabase
+  project currently sends 8). That verifies the address, and there is no password.
+  - The **Resend** button waits 60 seconds between emails, and Supabase also limits
+    how often emails can be sent.
+  - The session is stored in the iOS Keychain or Android Keystore.
+  - Sign in with Apple and Google are not available yet.
+- **Where data lives:**
+  - The device is the source of truth. Every change is saved locally first, so you
+    can create, edit, pause, resume and delete subscriptions, and view analytics,
+    while offline.
+  - Changes are queued in a durable outbox and sent when a connection is available:
+    after sign-in, after edits, when the app returns to the foreground, on
+    **Settings → Sync now**, and on automatic retries with backoff.
+- **Several devices:**
+  - If the same subscription was changed on two devices, Billfern doesn't pick a
+    winner. Settings shows the conflict, and you choose which version to keep.
+  - Deleted subscriptions are never brought back by an outdated device.
+- **Settings → Account & sync** shows:
+  - your sign-in status
+  - the sync status (offline, syncing, synced, pending changes, conflict or failed)
+  - when you last synced and how many changes are waiting
+  - Sync now / Retry, Sign out and Delete account
+
+  "Synced" is only shown once the server has confirmed every change.
+- **Signing out:** the account's data is hidden on the device, not deleted. Changes
+  that haven't synced yet stay on the device and sync after you sign in again.
+  Switching accounts never shows another account's data.
+- **Subscriptions you tracked before signing in:** after you sign in, Billfern asks
+  before uploading them. You can add them to your account or keep them on the device
+  only. All history is kept, subscriptions are never combined by name, and the copy
+  on the device is never deleted.
+- **Sample data** stays in memory and is never saved or uploaded.
+- **Deleting your account** removes it from Billfern's database right away: your
+  subscriptions, history, preferences and pending changes. The account's data on
+  this device is erased too. Database backups expire according to the Supabase
+  project's backup retention, and are not rewritten.
+- **Erasing this device's data** (Settings → Privacy) needs confirmation. For a
+  guest, it permanently deletes local subscriptions and history. For an account, it
+  removes the device's copy, which then downloads again from the cloud.
+
+### Supabase setup
+
+Use a **dedicated development project**. Nothing here touches production.
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. **Configure the app.** Copy `config/supabase.example.json` to
+   `config/supabase.json` (git-ignored). Fill in:
+   - `SUPABASE_URL`: Project Settings → API → Project URL.
+   - `SUPABASE_PUBLISHABLE_KEY`: the **publishable** key (`sb_publishable_…`), or the
+     legacy anon key.
+
+   Never use the service-role or secret key, or the database password, in the app.
+3. **Apply the database migrations** in filename order. Use either:
+   - the [Supabase CLI](https://supabase.com/docs/guides/cli):
+     ```bash
+     supabase link --project-ref <your-dev-project-ref>
+     supabase db push            # applies supabase/migrations/*.sql in order
+     ```
+   - or the dashboard **SQL Editor**: paste and run each file in
+     `supabase/migrations/`, oldest first.
+4. **Deploy the account-deletion function.** Use `supabase functions deploy
+   delete-account`, or Dashboard → Edge Functions → Deploy a new function: name it
+   `delete-account`, paste `supabase/functions/delete-account/index.ts`, and keep
+   **Verify JWT** on. It reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the
+   Edge runtime; the key stays on the server.
+5. **Use codes in sign-in emails.** Under Authentication → Emails, edit the
+   **Magic Link** template so the email contains the code `{{ .Token }}` (for example
+   "Your Billfern code is {{ .Token }}"). For production, configure custom SMTP.
+6. **Run the app** with the configuration:
+   ```bash
+   flutter run --dart-define-from-file=config/supabase.json
+   ```
+
+Without `config/supabase.json`, Billfern runs in local-only mode.
+
+### Database
+
+| Migration | Contents |
+|---|---|
+| `20261125120000_billfern_schema.sql` | `profiles`, `subscriptions` (integer minor units, tombstones, versions, server change sequence), immutable `subscription_revisions` (price terms and pauses), `payment_records` (prepared, unused), `sync_operations` (idempotency), integrity checks and triggers |
+| `20261125120100_billfern_rls.sql` | Revokes Supabase's default privileges, then grants the minimum. Row Level Security on every table with owner-only policies; financial tables are read-only for clients; no `anon` access |
+| `20261125120200_billfern_sync_functions.sql` | `sync_push` (idempotent, version-checked, the only write path) and `sync_pull` (transaction-ordered cursor, safe under concurrent writes). Both are `SECURITY DEFINER` with an empty `search_path`, require `auth.uid()` and filter every statement by it |
+
+**Security model:** clients can only **read** their own subscriptions, revisions and
+sync records. All writes go through `sync_push`, a `SECURITY DEFINER` function with an
+empty `search_path` that filters every statement by `auth.uid()`. Default Supabase
+table privileges (including `TRUNCATE`) are revoked, and anonymous clients have no
+access.
+
+**Security tests (pgTAP)** act as two separate users and an anonymous client, inside
+a transaction that is rolled back. Run them with `supabase test db` against a local
+stack (needs Docker). You can also paste
+`supabase/tests/database/rls.test.sql` into the dev project's SQL Editor after
+enabling the `pgtap` extension.
+
+### Live validation (dev project only)
+
+1. In the **dev** project, go to Authentication → Users → Add user. Create three
+   **test** users with "Auto confirm": A, B, and a disposable "delete me" user.
+2. Copy `config/supabase.test.example.json` to `config/supabase.test.local.json`
+   (git-ignored) and enter those test credentials.
+3. Run the live suite:
+   ```bash
+   flutter test test_live/live_supabase_test.dart --concurrency=1
+   ```
+
+It covers sign-in, anonymous and cross-account isolation, refused direct writes,
+two-device sync, offline recovery and duplicate delivery, conflicts, tombstones,
+guest migration, the display currency, and account deletion. It uses synthetic data
+only. Recreate the "delete me" user before each run. Email-code sign-in itself needs
+a real inbox, so test it manually in the app.
+
+### Validation status (Phase 5 checkpoint)
+
+**Verified manually against the dev project:**
+
+- Email-code sign-in, with emails delivered through Resend and 8-digit codes.
+- Offline edits saved locally and synced after reconnecting. The records arrived in
+  the remote database with the correct prices, currencies and billing cycles.
+- Recovery after a token refresh or request that hung while offline (15-second
+  HTTP timeout).
+
+**Still required before release (dev project, synthetic data only):**
+
+- [ ] Run the live suite (`test_live/live_supabase_test.dart`) with the three test
+      users in `config/supabase.test.local.json`. It covers cross-account isolation,
+      refused direct writes, two-device sync, duplicate delivery, conflicts, tombstones,
+      guest migration, the display currency and account deletion.
+- [ ] Run the pgTAP RLS tests (`supabase/tests/database/rls.test.sql`) against the
+      dev database.
+- [ ] Delete an account end to end through the `delete-account` Edge Function, and
+      confirm that the gateway JWT setting works with the project's API keys.
+- [ ] Sync between two real devices, including resolving a conflict in the UI.
+- [ ] Check the display currency syncs both ways between two devices.
+- [ ] Import guest data into an account that already has cloud data.
+- [ ] Check automatic sync after reconnecting on a **physical** iPhone. The
+      simulator may not report Wi-Fi changes.
+- [ ] Do an iOS build after adding `connectivity_plus` (`pod install`), with at least
+      15 GiB of free disk.
+- [ ] For production: custom SMTP, Sign in with Apple and Google, the App Store
+      sign-in requirements, and a backup and retention review.
+
+### Sync limitations
+
+- Live validation is **partial** (see Validation status). Flutter tests use mocked
+  clients plus a local HTTP server, and the RLS tests have not been run against a
+  real database yet.
+- Account deletion has not been tested against a live project, so it blocks release.
+- Sign in with Apple and Google, data export from the UI, and permanent deletion of
+  the server history of individual subscriptions are not available yet.
+- **Reconnecting:** when the device's network comes back, Billfern waits a few
+  seconds for it to settle and then sends pending changes automatically. You don't
+  need to tap **Retry sync**.
+  - A network connection doesn't guarantee that the server is reachable. If the
+    attempt fails, changes stay safely queued on the device and are retried with
+    increasing delays.
+  - If there's nothing to send, reconnecting makes no request.
+  - Changes the server rejected wait for **Retry sync**.
+  - Every Supabase request times out after 15 seconds, so a request that hung while
+    offline never blocks sync after the connection returns.
+  - The iOS Simulator may not report Wi-Fi changes. There, sync still recovers on the
+    next retry, when the app returns to the foreground, or with **Retry sync**.
+- If the display currency changes on two devices before they sync, the cloud value
+  wins (it's a display preference only).
+
 ## Multi-currency
 
 Billfern is built for international users:
@@ -161,7 +334,9 @@ See [CLAUDE.md](CLAUDE.md#multi-currency) for the architecture.
 | Typography | Google Fonts, Manrope |
 | Icons | Lucide (`lucide_icons_flutter`) |
 | Charts | FL Chart |
-| Planned | Supabase (auth and data), OpenAI (insights), RevenueCat (monetization), Flutter Local Notifications (reminders) |
+| Local storage | sembast (one database per identity), shared_preferences |
+| Backend (optional) | Supabase: Auth (email codes), PostgreSQL with RLS, Edge Functions; `flutter_secure_storage` for sessions |
+| Planned | OpenAI (insights), RevenueCat (monetization), Flutter Local Notifications (reminders) |
 
 ## Architecture
 
@@ -215,12 +390,16 @@ network connection the first time the app runs.
 dart format lib test
 flutter analyze
 flutter test --concurrency=2   # keeps memory use modest
+supabase test db               # database security tests (local Supabase stack)
 ```
 
 ## Configuration
 
-No API keys are required at this stage. When backend services are added, secrets will
-be supplied through `--dart-define` or environment configuration and will never be committed.
+No configuration is needed for local-only use. Cloud sync reads `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` at build time from `config/supabase.json` (see
+[Supabase setup](#supabase-setup)). That file is git-ignored and must only contain the
+public URL and the publishable key. Secrets such as the service-role key belong only in
+Supabase's server-side environment and are never committed.
 
 ## License
 

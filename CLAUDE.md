@@ -41,8 +41,9 @@ premium plans.
 
 ### Current phase
 
-Frontend only, with data stored locally on the device. **Do not integrate** Supabase,
-authentication, OpenAI, RevenueCat, payments, banking or exchange-rate APIs until asked.
+Local-first app with **optional** Supabase accounts, cloud backup and sync (Phase 5).
+**Do not integrate** OpenAI, RevenueCat, payments, banking, exchange-rate APIs or
+notification scheduling until asked.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -51,9 +52,10 @@ authentication, OpenAI, RevenueCat, payments, banking or exchange-rate APIs unti
 | 2.1 — Catalog and logos | 82-service catalog, 59 Simple Icons logos, `SubscriptionLogo` | ✅ Done |
 | 2.2 — Multi-currency | `Money`, conversion, display-currency preference | ✅ Done |
 | 3 — Subscription management | Subscriptions list, add (catalog or custom), details, edit, pause/resume, delete, local persistence | ✅ Done |
-| 3.1 — Branding | Official logo (`BillfernLogo`), first-launch welcome, onboarding gate, Settings About | ✅ Done (awaiting review) |
-| 4 — Analytics | Analytics screen, history revisions, upcoming payments, smart suggestions (`docs/specifications/phase-04-analytics.md`) | ✅ Done (awaiting review) |
-| Later | Backend (5), AI insights (6), notifications (7), monetization (8): see `docs/specifications/` | ⏳ |
+| 3.1 — Branding | Official logo (`BillfernLogo`), first-launch welcome, onboarding gate, Settings About | ✅ Done |
+| 4 — Analytics | Analytics screen, history revisions, upcoming payments, smart suggestions (`docs/specifications/phase-04-analytics.md`) | ✅ Done |
+| 5 — Backend | Optional email-code accounts, offline-first Supabase sync, RLS, guest migration, account deletion (`docs/specifications/phase-05-backend.md`) | ✅ Implemented; checkpoint committed (partial live validation: see README "Validation status") |
+| Later | AI insights (6), notifications (7), monetization (8): see `docs/specifications/` | ⏳ |
 
 Home is the dashboard (`DashboardScreen`). "+" opens the add flow, and renewal cards and
 recent rows open subscription details. Notifications and the smart tip still show a
@@ -75,7 +77,8 @@ weights and chart styling, using Billfern's tokens and brand.
 | Charts | `fl_chart` |
 | Formatting | `intl` |
 | Local storage | `sembast` (pure-Dart document DB: subscriptions) and `shared_preferences` (small settings), plus `path_provider` |
-| Future work | `supabase_flutter`, `flutter_local_notifications` (installed, not wired yet) |
+| Backend | `supabase_flutter` (auth, RPC, Edge Functions), `flutter_secure_storage` (session in Keychain / Keystore), `http` (request-timeout client), `connectivity_plus` (reconnect signal) |
+| Future work | `flutter_local_notifications` (installed, not wired yet) |
 
 Identifiers: Dart package `billfern` (`package:billfern/…` imports), bundle ID / application ID
 `com.billfern.app` (iOS, Android, macOS, Linux), display name **Billfern**. Android's
@@ -119,6 +122,10 @@ tool/catalog/build_catalog.py        # source of truth for catalog + logos
 docs/brand-logos.md                  # generated logo attribution and guidelines
 docs/design/dashboard-reference.png  # visual reference
 docs/specifications/                 # one specification per phase (see Documentation system)
+config/supabase.example.json         # build-time config template (real file is git-ignored)
+supabase/migrations/                 # versioned SQL: schema, RLS, sync functions
+supabase/functions/delete-account/   # Edge Function: trusted account deletion
+supabase/tests/database/             # pgTAP RLS tests (supabase test db)
 ```
 
 ### Routing
@@ -243,6 +250,153 @@ preferredCurrencyProvider + exchangeRatesProvider → moneyConverterProvider ─
   *Sample data*, never as real AI analysis. Swap the provider to integrate OpenAI later.
 - Sample data (`buildMockSubscriptions`) is only ever served by
   `DemoSubscriptionRepository`; see Subscriptions and persistence.
+
+### Backend, accounts and sync (Phase 5)
+
+**Offline-first.** sembast is the source of truth. Widgets and providers only ever read
+local repositories. Supabase is a sync and backup layer, never a competing data
+source, and no local operation waits for the network.
+
+- **Configuration** (`SupabaseConfig.fromEnvironment`): `SUPABASE_URL` and
+  `SUPABASE_PUBLISHABLE_KEY` come from `--dart-define-from-file=config/supabase.json`.
+  The real file is git-ignored; copy `config/supabase.example.json`. Missing or
+  placeholder values, or a failed `Supabase.initialize`, mean **local-only mode**:
+  `AuthUnavailable`, `LocalOnlyAuthRepository`, no `SyncRemote`, and nothing crashes.
+  Never compile service-role keys, database passwords or admin tokens into the app.
+- **Request timeouts** (`core/network/timeout_http_client.dart`): `main` passes
+  `TimeoutHttpClient` to `Supabase.initialize`, so every Supabase request (PostgREST,
+  Auth, Functions) fails after 15 s without headers or body progress. Neither
+  `dart:io` nor Supabase Auth time out on their own, and Auth shares **one** token
+  refresh between all requests: a refresh that hung while offline used to block
+  every request after reconnecting, so "Retry sync" never recovered. Keep it.
+  `SupabaseSyncRemote` also caps each call at 20 s. Regression tests:
+  `test/features/sync/sync_reconnect_test.dart`.
+- **Identity-scoped storage** (`shared/data/local_store.dart`): one sembast file per
+  identity. The guest uses `billfern.db` (unchanged, so existing installs keep their
+  data). Each account uses `billfern_account_<userId>.db`.
+  - `activeLocalStoreProvider` (`LocalStoreController`) opens the new file before
+    swapping, serializes switches, and closes the old file.
+    `personalSubscriptionRepositoryProvider` follows it.
+  - **Account isolation** follows from this: signing out shows the guest database, and
+    another account never sees or uploads someone else's records or pending
+    operations. Signing out never deletes data; account files stay isolated and
+    hidden until the next sign-in.
+- **Authentication** (`features/account/`):
+  - `AuthRepository` with `SupabaseAuthRepository` (email **one-time code**:
+    `signInWithOtp(shouldCreateUser:)` then `verifyOTP(type: email)`; no deep links,
+    `detectSessionInUri: false`), `LocalOnlyAuthRepository`, and fakes in tests.
+  - **Codes are 6–10 digits** (`OtpCode`, `isPlausibleCode`); the Supabase project
+    currently sends 8. Never hardcode a length or say "6-digit" in copy. Codes stay
+    strings (leading zeros kept), `OtpCode.normalize` handles pasted text (spaces,
+    hyphens, a whole email line), and the full code goes to `verifyOTP` unchanged.
+  - Sessions are stored in `SecureSessionStorage` (`flutter_secure_storage`).
+  - `AuthController` (`AuthUnavailable` / `SignedOut(sessionExpired)` / `SignedIn`)
+    switches stores on verify, sign-out and expiry. An unexpected `signedOut` event
+    means the session expired.
+  - Failures are typed (`AuthFailureKind`) with fixed messages. **Never log or display
+    tokens, emails from errors, or raw server messages.**
+  - Apple and Google sign-in can be added as further methods. Don't claim they work
+    until credentials are configured and tested.
+- **Outbox** (`SyncStore`, account databases only): `SembastSubscriptionRepository`
+  writes each change and its `OutboxOperation` in **one transaction** (through the
+  `SubscriptionChangeRecorder`). Operations survive restarts.
+  - Unsent operations for the same subscription are merged.
+  - Attempted operations are never merged, because they may already be on the server.
+  - Rejected operations are **parked**, never discarded.
+- **Sync protocol** (`SyncEngine`, `SupabaseSyncRemote`, and the SQL in
+  `supabase/migrations/`):
+  - `sync_push`: idempotent per `opId` through the `sync_operations` table.
+    **Version-checked**: the base version is the last acknowledged or pulled version
+    from `sync_versions`; `null` means "must not exist".
+  - Deletion is a **tombstone** (`deleted_at`). An outdated edit of a deleted record is
+    a conflict, never a resurrection.
+  - `sync_pull`: the opaque cursor is `"xid:seq"`, ordered by
+    **`(change_xid, server_seq)`** and paginated. It only returns rows whose
+    `change_xid` is older than the snapshot `xmin`. Any transaction that can still
+    commit has a larger xid, so the cursor can never skip a concurrent write. Never
+    order by `server_seq` alone: a transaction that takes its xid early and its
+    sequence late can commit a higher sequence first.
+  - Pulled pages are applied with their versions and cursor in one transaction via
+    `applyRemote`, and **never create operations**. Records with pending operations
+    or conflicts are skipped by pulls.
+  - Runs are single-flight. A manual run requested during an automatic run runs again
+    afterwards.
+  - Pushes are FIFO. Transient failures stop the push and back off (5 s doubling,
+    capped at 15 min).
+  - Triggers: sign-in, local edits (debounced), app resume (`SyncLifecycleObserver`),
+    connectivity returning, manual sync or retry, and backoff timers. Manual runs
+    ignore backoff and retry parked operations, so "Retry sync" attempts delivery
+    immediately. The retry timer uses `clockProvider`, the same clock that stamps
+    `nextAttemptAt`.
+  - **Connectivity** (`ConnectivitySignal`; `ConnectivityPlusSignal` from `main` only
+    when sync is configured; `NoConnectivitySignal` by default and in tests, which
+    use `FakeConnectivity`) is a **hint, never proof** that Supabase is reachable:
+    - Only an offline → online transition seen by the current `SyncController` build
+      counts; it is debounced (`connectivityDebounceProvider`, 3 s) and cancelled if
+      the network drops again.
+    - It syncs only if there are deliverable (non-parked) operations or the last run
+      failed offline, so reconnecting costs no request otherwise.
+    - `SyncEngine.expediteRetries` clears backoff delays but keeps attempt counts, so a
+      further failure backs off as usual. Parked operations wait for "Retry sync".
+    - A run already in flight finishes first; then one fresh run follows (single-flight
+      engine, no loops).
+    - The listener exists only while signed in with an engine. Guests, local-only
+      builds and sample data never listen. Sign-out and identity switches cancel it
+      through `ref.onDispose`, and timers are cancelled too.
+    - The iOS Simulator may not report Wi-Fi changes (connectivity_plus issue 479), so
+      verify on a device; Retry, app resume and backoff still cover it.
+  - The display currency syncs **both ways** through `profiles`
+    (`ProfileSyncPolicy`, `profile_sync.dart`). Changes are detected against the
+    last synced state (stored server `updated_at`, compared for equality only; never
+    device clocks). A new device adopts the account currency. If only one side
+    changed, that side wins. If both changed, the cloud wins.
+- **Conflict strategy:** any version mismatch becomes a `SyncConflict`, unless both
+  sides decode to identical data. The user chooses `keepThisDevice` (re-sent with the
+  cloud version as base, which also restores tombstones) or `useCloud`. Financial
+  data is never overwritten silently. `SyncStatus` never reports success while
+  operations or conflicts remain.
+- **Guest → account** (`GuestMigrationService`, `ImportGuestDataScreen`):
+  - Consent comes first, showing a summary and whether the cloud account already has
+    data. Choices are **merge** (union by id) or **keep local only**.
+  - Merging copies every field and all history (revisions, pauses, ended records).
+    It is idempotent and resumable (skips existing ids), never deduplicates by name,
+    and never deletes guest data.
+  - The decision is stored in the account's `sync_meta`.
+  - Sample data is in memory and never in any database, outbox or upload.
+- **Deletion and reset:**
+  - `AuthController.deleteAccount` calls the `delete-account` Edge Function. It uses
+    the service-role key server-side, validates the JWT, needs a confirmation phrase,
+    and cascades through foreign keys to `auth.users`. It then destroys the account's
+    local file.
+  - `eraseThisDevice` erases the current identity's file. For an account, data is
+    downloaded again from the cloud.
+  - `DataExportService` builds a portable JSON export (architecture only).
+- **Database rules** (SQL):
+  - Supabase's **default privileges grant ALL**, including `TRUNCATE` (which RLS
+    doesn't cover), to `anon` and `authenticated`. Every table migration must
+    `revoke all … from public, anon, authenticated` and then grant the minimum.
+  - `subscriptions`, `subscription_revisions` and `sync_operations` are **read-only**
+    for clients (RLS select-own).
+  - **Writes only through `sync_push`/`sync_pull`**: these are `SECURITY DEFINER`
+    with `set search_path = ''`, refuse to run without `auth.uid()`, filter every
+    statement by that uid, and never accept a user id from the caller.
+  - Helper functions aren't executable by clients. Any new definer function needs
+    the same discipline.
+  - `profiles` and `payment_records` use owner-only RLS (`USING` plus `WITH CHECK`).
+    Clients may only write `source = 'manual'` payments; bank-sourced records must come
+    from a trusted server process. Profile timestamps are trigger-assigned (`updated_at`
+    is the currency-sync change token).
+  - Trigger functions are revoked from clients too.
+  - `anon` has no privileges.
+  - Relationships use composite keys `(user_id, …)`, so cross-owner references fail.
+  - Revisions and sync operations are immutable.
+  - Ownership changes are rejected by triggers.
+  - Money is `bigint` minor units with a 3-letter code. Calendar data is `date`;
+    events are UTC `timestamptz`.
+  - Remote ids are the stable client ids. New ones are UUID v4; old `sub_…` ids stay,
+    under primary key `(user_id, id)`.
+  - Schema changes are **new** files in `supabase/migrations/`. Never edit applied
+    migrations, and don't deploy to a production project without the user's approval.
 
 ### Analytics (`features/analytics/`)
 
@@ -611,6 +765,33 @@ flutter test
     on the `fl_chart` chart are consumed by the chart. The Home tab's list stays
     mounted offstage, so scope finders with `_inAnalytics`.
   - Migrations: `test/shared/data/subscription_migration_test.dart`.
+- Phase 5 tests:
+  - `test/helpers/fake_cloud.dart` provides `FakeCloud` and `FakeSyncRemote`, which
+    mirror the SQL semantics (op ids, versions, tombstones, sequence, pagination,
+    offline, lost acknowledgements, rejections), plus `FakeAuthRepository` and
+    `memoryOpener()` (in-memory sembast).
+  - `test/features/sync/sync_engine_test.dart`: offline changes, delivery guarantees,
+    restart recovery with a real file database, pulls, and every conflict type.
+  - `sync_support_test.dart`: config, UUIDs, wire format, error mapping and status
+    wording.
+  - `connectivity_sync_test.dart`: automatic sync on reconnect, debouncing, no
+    request when idle, hint-not-proof (still queued and backing off), parked ops,
+    in-flight runs, guest mode, sign-out, account isolation and disposal.
+  - `sync_reconnect_test.dart`: real Supabase client against a local server (hung
+    token refresh, timeouts).
+  - `test/features/account/account_test.dart`: auth, session restore and expiry,
+    isolation, sample exclusion, migration, deletion, reset, export, and cross-device
+    dashboard and Analytics consistency.
+  - `account_ui_test.dart`: screens, consent, typed deletion, offline status,
+    overflow and accessibility.
+  - These are **mocked**. Real PostgreSQL and RLS behaviour is covered by
+    `supabase/tests/database/rls.test.sql` (pgTAP) and by the **live suite**
+    `test_live/live_supabase_test.dart`. Run it with
+    `flutter test test_live/live_supabase_test.dart --concurrency=1`.
+  - The live suite uses the dev project, dedicated test users from
+    `config/supabase.test.local.json` (git-ignored) and synthetic data only. It skips
+    when not configured. Never point it at production, and don't claim RLS works from
+    Flutter tests alone.
 - Catalog tests (`test/shared/data/`) check that every bundled logo path exists, the
   required services are present, there are no prices, and search ranking. Logo tests
   cover the resolution order and missing-asset fallbacks.
