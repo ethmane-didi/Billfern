@@ -1,10 +1,21 @@
-// Live validation against the billfern-dev Supabase project.
+// Live validation against a real Supabase stack: the billfern-dev project,
+// or the disposable local stack started by CI (`.github/workflows/backend-ci.yml`).
 //
 //   flutter test test_live/live_supabase_test.dart --concurrency=1
 //
 // Needs (both git-ignored):
 //   config/supabase.json             SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY
 //   config/supabase.test.local.json  dedicated test users (see the example)
+//
+// Environment (all optional):
+//   BILLFERN_LIVE_CONFIG    path to the Supabase config JSON (default above)
+//   BILLFERN_LIVE_USERS     path to the test users JSON (default above)
+//   BILLFERN_LIVE_REQUIRED  "true": fail instead of skipping when not configured
+//   BILLFERN_LIVE_DELETION  "run": permanently delete the deleteMe user
+//                           (anything else skips the destructive test)
+//
+// Every test user email must start with "billfern-test-" (synthetic accounts
+// only); anything else fails before any request is made.
 //
 // Uses ONLY synthetic test data and dedicated test accounts. Never point it
 // at production. Records are created with a per-run id prefix; synced
@@ -45,9 +56,24 @@ class _Live {
   final Map<String, ({String email, String password})> users;
 }
 
+final Map<String, String> _env = Platform.environment;
+
+/// CI sets this so a missing configuration fails instead of skipping.
+final bool _required = _env['BILLFERN_LIVE_REQUIRED'] == 'true';
+
+/// The destructive account-deletion test runs only when explicitly enabled.
+final bool _runDeletion = _env['BILLFERN_LIVE_DELETION'] == 'run';
+
+/// Synthetic accounts only: never a personal account.
+const String _syntheticPrefix = 'billfern-test-';
+
 _Live? _load() {
-  final configFile = File('config/supabase.json');
-  final usersFile = File('config/supabase.test.local.json');
+  final configFile = File(
+    _env['BILLFERN_LIVE_CONFIG'] ?? 'config/supabase.json',
+  );
+  final usersFile = File(
+    _env['BILLFERN_LIVE_USERS'] ?? 'config/supabase.test.local.json',
+  );
   if (!configFile.existsSync() || !usersFile.existsSync()) return null;
   final c = jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
   final config = SupabaseConfig(
@@ -69,6 +95,15 @@ _Live? _load() {
     }
   }
   if (!users.containsKey('userA') || !users.containsKey('userB')) return null;
+  for (final user in users.values) {
+    if (!user.email.toLowerCase().startsWith(_syntheticPrefix)) {
+      // Never name the address: it may be personal.
+      throw StateError(
+        'Live tests accept only synthetic users whose email starts with '
+        '"$_syntheticPrefix".',
+      );
+    }
+  }
   return _Live(config, users);
 }
 
@@ -166,11 +201,20 @@ class Device {
 void main() {
   final live = _load();
   if (live == null) {
-    test(
-      'live Supabase validation',
-      () {},
-      skip: 'Missing config/supabase.json or config/supabase.test.local.json',
-    );
+    if (_required) {
+      test('live Supabase validation is configured', () {
+        fail(
+          'BILLFERN_LIVE_REQUIRED is set but the Supabase config or the test '
+          'users are missing or invalid.',
+        );
+      });
+    } else {
+      test(
+        'live Supabase validation',
+        () {},
+        skip: 'Missing config/supabase.json or config/supabase.test.local.json',
+      );
+    }
     return;
   }
 
@@ -514,7 +558,7 @@ void main() {
   });
 
   group('account deletion', () {
-    test('requires an authenticated owner and confirmation', () async {
+    test('requires an authenticated session', () async {
       final anon = newClient();
       await expectLater(
         anon.functions.invoke(
@@ -525,36 +569,50 @@ void main() {
           isA<FunctionException>().having((e) => e.status, 'status', 401),
         ),
       );
-      if (!live.users.containsKey('deleteMe')) {
-        markTestSkipped('No deleteMe user configured');
-        return;
-      }
-      final victim = await device('deleteMe');
-      await victim.save(synthetic(sid('delete-me')));
-      expect((await victim.engine.sync()).succeeded, isTrue);
-
-      await expectLater(
-        victim.client.functions.invoke(
-          'delete-account',
-          body: {'confirm': 'nope'},
-        ),
-        throwsA(
-          isA<FunctionException>().having((e) => e.status, 'status', 400),
-        ),
-      );
-      final response = await victim.client.functions.invoke(
-        'delete-account',
-        body: {'confirm': 'DELETE MY ACCOUNT'},
-      );
-      expect(response.status, 200);
-
-      // The account no longer exists…
-      await expectLater(signedIn('deleteMe'), throwsA(isA<AuthException>()));
-      // …and its still-valid token cannot recreate records.
-      await victim.save(synthetic(sid('after-delete')));
-      final report = await victim.engine.sync();
-      expect(report.succeeded, isFalse);
-      expect(await victim.store.sync!.pending(), isNotEmpty);
     });
+
+    test(
+      'deletes only the owner after confirmation; stale tokens cannot '
+      'recreate data',
+      skip: _runDeletion
+          ? false
+          : 'Destructive: set BILLFERN_LIVE_DELETION=run to delete the '
+                'synthetic deleteMe user',
+      () async {
+        if (!live.users.containsKey('deleteMe')) {
+          fail('BILLFERN_LIVE_DELETION=run needs a deleteMe test user');
+        }
+        final victim = await device('deleteMe');
+        await victim.save(synthetic(sid('delete-me')));
+        expect((await victim.engine.sync()).succeeded, isTrue);
+
+        await expectLater(
+          victim.client.functions.invoke(
+            'delete-account',
+            body: {'confirm': 'nope'},
+          ),
+          throwsA(
+            isA<FunctionException>().having((e) => e.status, 'status', 400),
+          ),
+        );
+        final response = await victim.client.functions.invoke(
+          'delete-account',
+          body: {'confirm': 'DELETE MY ACCOUNT'},
+        );
+        expect(response.status, 200);
+
+        // The account no longer exists…
+        await expectLater(signedIn('deleteMe'), throwsA(isA<AuthException>()));
+        // …and its still-valid token cannot recreate records.
+        await victim.save(synthetic(sid('after-delete')));
+        final report = await victim.engine.sync();
+        expect(report.succeeded, isFalse);
+        expect(await victim.store.sync!.pending(), isNotEmpty);
+
+        // Other accounts are untouched.
+        final a = await signedIn('userA');
+        expect(a.auth.currentSession, isNotNull);
+      },
+    );
   });
 }

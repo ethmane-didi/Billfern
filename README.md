@@ -240,8 +240,105 @@ enabling the `pgtap` extension.
 It covers sign-in, anonymous and cross-account isolation, refused direct writes,
 two-device sync, offline recovery and duplicate delivery, conflicts, tombstones,
 guest migration, the display currency, and account deletion. It uses synthetic data
-only. Recreate the "delete me" user before each run. Email-code sign-in itself needs
-a real inbox, so test it manually in the app.
+only, and every test user's email must start with `billfern-test-`. The suite refuses
+to run otherwise.
+
+Account deletion is destructive, so it only runs with
+`BILLFERN_LIVE_DELETION=run`. Recreate the "delete me" user before each such run.
+Other options:
+- `BILLFERN_LIVE_CONFIG` and `BILLFERN_LIVE_USERS` override the configuration paths.
+- `BILLFERN_LIVE_REQUIRED=true` makes a missing configuration fail instead of skip.
+
+Email-code sign-in itself needs a real inbox, so test it manually in the app.
+
+### Continuous integration
+
+There are two GitHub Actions tracks, kept strictly apart.
+
+**Track 1: isolated backend CI** (`.github/workflows/backend-ci.yml`), active.
+
+- **Triggers:**
+  - pushes and pull requests to `main` and `feat/backend` that touch backend
+    files: `supabase/`, `test_live/`, `lib/features/sync|account`, `lib/core`,
+    `lib/shared`, `lib/main.dart`, the sync and account tests and helpers, the
+    example configs, `tool/ci/`, `pubspec.*`, `analysis_options.yaml` or the
+    workflow itself
+  - manual runs
+- **Where:** a GitHub-hosted Ubuntu runner with a **disposable** local Supabase
+  stack. `supabase start` runs Postgres, Auth, PostgREST, the gateway and the Edge
+  runtime; everything else is disabled.
+- **Credentials:** none. No repository secrets and no remote Supabase credentials.
+  The stack's keys and three synthetic users with random passwords exist only for
+  the run.
+- **Coverage:**
+  - the mocked sync and account suites (at least 95 tests)
+  - every migration applied from scratch, checked against
+    `supabase_migrations.schema_migrations`
+  - all **37** pgTAP checks in `supabase/tests/database/rls.test.sql`
+  - the full live suite against the local stack, all 11 tests including end-to-end
+    account deletion: cross-account isolation, sync, offline recovery and duplicate
+    delivery, conflicts, tombstones, guest migration and display currency
+- **Strict checks:** `tool/ci/check_test_report.py` fails the job if any test is
+  skipped, failed, missing or duplicated, or if fewer tests ran than expected. The
+  expected live tests are listed in `tool/ci/live_suite_tests.txt`.
+- **Pinned versions:** Flutter 3.47.2, Supabase CLI 2.113.0, Postgres 17 (the dev
+  project's version) and actions pinned to commit SHAs.
+- **Limits:** 30-minute timeout; a new push cancels the previous run on the same ref.
+
+**Track 2: live dev-project validation** (`.github/workflows/backend-live-dev.yml`),
+prepared but **not active**.
+
+- **Trigger:** manual only, and only once the workflow is on `main` (GitHub offers
+  manual runs only for workflows on the default branch).
+- **Safety gate:** it fails closed unless all of these hold:
+  - the repository variable `BILLFERN_LIVE_DEV_ENABLED` is `true`
+  - the run is on `main` or `feat/backend`
+  - the run is at the exact commit SHA you entered
+  - the `supabase-dev` environment has required reviewers and a deployment branch
+    policy
+- **Project guard:** the dev URL must match `BILLFERN_DEV_PROJECT_REF`, and must not
+  match `BILLFERN_PROD_PROJECT_REF` if that is set.
+- **Test users:** must be synthetic (`billfern-test-*`).
+- **Concurrency:** one live run at a time; queued runs wait.
+- **Account deletion:**
+  - off by default
+  - needs the input, the typed phrase `DELETE SYNTHETIC TEST USER`, and a separate
+    approval in the `supabase-dev-destructive` environment
+  - runs only the deletion test
+
+**Future environment configuration** (not yet set; activation needs explicit
+approval):
+
+| Where | Name | Kind |
+|---|---|---|
+| Repository | `BILLFERN_LIVE_DEV_ENABLED` | Variable (`true` to activate) |
+| Environment `supabase-dev` (required reviewers, branches `main` and `feat/backend`) | `DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`, `DEV_TEST_USER_A_EMAIL`, `DEV_TEST_USER_A_PASSWORD`, `DEV_TEST_USER_B_EMAIL`, `DEV_TEST_USER_B_PASSWORD` | Secrets |
+| Environment `supabase-dev` | `BILLFERN_DEV_PROJECT_REF`, optionally `BILLFERN_PROD_PROJECT_REF` | Variables |
+| Environment `supabase-dev-destructive` (its own required reviewers) | The same secrets and variables plus `DEV_TEST_DELETE_EMAIL` and `DEV_TEST_DELETE_PASSWORD` | Secrets and variables |
+
+No service-role key, database password or Supabase access token is ever stored in
+CI. Migrations and Edge Functions are deployed manually, after approval.
+
+**Security boundaries:**
+- The repository is public, so logs are public:
+  - values derived from secrets (the dev host and project ref) are masked
+  - configuration files are written to the runner's temporary directory, outside
+    the workspace, and deleted after the run
+  - nothing is uploaded as an artifact
+- Workflows get `contents: read` permissions only (the gate adds `actions: read`).
+- Workflows never use `pull_request_target`, and secrets never reach pull requests
+  from forks.
+- The local-user script refuses any API URL that is not `127.0.0.1` or
+  `localhost`.
+
+**Estimated runner costs** (check GitHub's current pricing):
+- Standard GitHub-hosted runners are free for public repositories.
+- A Track 1 run takes about 10–15 minutes (image pulls, Flutter setup, tests); a
+  Track 2 run about 5 minutes.
+- If the repository becomes private, the Free plan includes 2,000 Linux minutes a
+  month, which is roughly 130–200 Track 1 runs.
+- The dev project stays on Supabase's free plan. Free projects pause after about a
+  week of inactivity, so resume it before running Track 2.
 
 ### Validation status (Phase 5 checkpoint)
 
@@ -253,16 +350,21 @@ a real inbox, so test it manually in the app.
 - Recovery after a token refresh or request that hung while offline (15-second
   HTTP timeout).
 
+**Covered by isolated CI** (Track 1, once the workflow is committed and green):
+migrations from scratch, all 37 pgTAP checks, cross-account isolation, sync, offline
+recovery, conflicts, guest migration, display currency, and end-to-end account
+deletion on a disposable local stack.
+
 **Still required before release (dev project, synthetic data only):**
 
-- [ ] Run the live suite (`test_live/live_supabase_test.dart`) with the three test
-      users in `config/supabase.test.local.json`. It covers cross-account isolation,
-      refused direct writes, two-device sync, duplicate delivery, conflicts, tombstones,
-      guest migration, the display currency and account deletion.
-- [ ] Run the pgTAP RLS tests (`supabase/tests/database/rls.test.sql`) against the
-      dev database.
-- [ ] Delete an account end to end through the `delete-account` Edge Function, and
-      confirm that the gateway JWT setting works with the project's API keys.
+- [ ] A first green Track 1 run on GitHub Actions.
+- [ ] Activate and run Track 2 (non-destructive) against the dev project, once
+      approved and configured.
+- [ ] Delete an account end to end on the dev project (Track 2's destructive job or
+      by hand), and confirm that the gateway JWT setting works with the project's API
+      keys.
+- [ ] Check migration drift by hand: `supabase migration list` and
+      `supabase db push --dry-run`.
 - [ ] Sync between two real devices, including resolving a conflict in the UI.
 - [ ] Check the display currency syncs both ways between two devices.
 - [ ] Import guest data into an account that already has cloud data.
@@ -275,9 +377,9 @@ a real inbox, so test it manually in the app.
 
 ### Sync limitations
 
-- Live validation is **partial** (see Validation status). Flutter tests use mocked
-  clients plus a local HTTP server, and the RLS tests have not been run against a
-  real database yet.
+- Live validation is **partial** (see Validation status). The RLS and end-to-end
+  tests run on a disposable local Supabase stack in CI. The dev project itself has
+  only been validated manually so far.
 - Account deletion has not been tested against a live project, so it blocks release.
 - Sign in with Apple and Google, data export from the UI, and permanent deletion of
   the server history of individual subscriptions are not available yet.

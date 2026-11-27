@@ -1,6 +1,21 @@
-# Supabase CLI configuration (local development and deployment settings).
+# Supabase CLI configuration (local development, CI and deployment settings).
 # Run `supabase link --project-ref <dev-project-ref>` before `supabase db push`.
+#
+# These settings shape the LOCAL stack (`supabase start`, used by CI in
+# .github/workflows/backend-ci.yml). They are not pushed to a hosted project
+# unless someone runs `supabase config push`, which Billfern never does.
 project_id = "billfern"
+
+[db]
+# Must match the billfern-dev project (Postgres 17), so CI validates the
+# migrations on the same major version.
+major_version = 17
+
+[auth.email]
+# Local stack only: CI test users are created confirmed through the admin API.
+enable_confirmations = false
+# Mirrors the hosted project's email one-time code length.
+otp_length = 8
 
 [functions.delete-account]
 # The gateway rejects requests without a valid user JWT; the function also

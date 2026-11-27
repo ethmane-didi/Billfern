@@ -1,0 +1,349 @@
+# Track 2 — live validation against the billfern-dev Supabase project.
+#
+# PREPARED BUT NOT ACTIVE. It fails closed until ALL of the following exist:
+#   - repository variable BILLFERN_LIVE_DEV_ENABLED = "true" (set only after
+#     explicit approval),
+#   - environment "supabase-dev" with required reviewers and a deployment
+#     branch policy, holding the dev secrets and BILLFERN_DEV_PROJECT_REF,
+#   - for account deletion only: environment "supabase-dev-destructive" with
+#     its own required reviewers (a second, separate approval).
+#
+# GitHub only offers workflow_dispatch for workflows present on the default
+# branch (main), so this cannot run before feat/backend is merged.
+#
+# Synthetic test accounts only (emails must start with "billfern-test-").
+# Never targets production. Account deletion is off unless explicitly
+# requested AND confirmed AND approved in the destructive environment.
+name: Backend live validation (dev project)
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Full commit SHA you approved for this run"
+        required: true
+        type: string
+      run_account_deletion:
+        description: "Permanently delete the synthetic deleteMe user (destructive)"
+        required: false
+        default: false
+        type: boolean
+      deletion_confirmation:
+        description: 'Type "DELETE SYNTHETIC TEST USER" to confirm deletion'
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+# Never two live runs at once; queued runs wait instead of cancelling.
+concurrency:
+  group: backend-live-dev
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.47.2"
+  ALLOWED_REFS: "refs/heads/main refs/heads/feat/backend"
+  DELETION_PHRASE: "DELETE SYNTHETIC TEST USER"
+  DELETION_TEST: "deletes only the owner after confirmation"
+
+jobs:
+  gate:
+    name: Safety gate (fails closed)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      deletion: ${{ steps.checks.outputs.deletion }}
+    steps:
+      - name: Check activation, ref, commit and protections
+        id: checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENABLED: ${{ vars.BILLFERN_LIVE_DEV_ENABLED }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          RUN_DELETION: ${{ inputs.run_account_deletion }}
+          CONFIRMATION: ${{ inputs.deletion_confirmation }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            echo "Live validation is not activated (BILLFERN_LIVE_DEV_ENABLED)." >&2
+            exit 1
+          fi
+          allowed=false
+          for ref in $ALLOWED_REFS; do
+            [ "$GITHUB_REF" = "$ref" ] && allowed=true
+          done
+          if [ "$allowed" != true ]; then
+            echo "Ref $GITHUB_REF is not approved for live validation." >&2
+            exit 1
+          fi
+          if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || [ "$EXPECTED_SHA" != "$GITHUB_SHA" ]; then
+            echo "expected_sha must be the full SHA of the dispatched commit." >&2
+            exit 1
+          fi
+
+          require_protection() {
+            local env_name="$1" json
+            if ! json=$(gh api "repos/$GITHUB_REPOSITORY/environments/$env_name" 2>/dev/null); then
+              echo "Environment $env_name does not exist or cannot be read." >&2
+              exit 1
+            fi
+            if ! echo "$json" | jq -e \
+              '[.protection_rules[]? | select(.type == "required_reviewers")
+                | (.reviewers | length)] | any(. > 0)' >/dev/null; then
+              echo "Environment $env_name has no required reviewers." >&2
+              exit 1
+            fi
+            if ! echo "$json" | jq -e '.deployment_branch_policy != null' >/dev/null; then
+              echo "Environment $env_name has no deployment branch policy." >&2
+              exit 1
+            fi
+          }
+          require_protection supabase-dev
+
+          deletion=false
+          if [ "$RUN_DELETION" = "true" ]; then
+            if [ "$CONFIRMATION" != "$DELETION_PHRASE" ]; then
+              echo "Account deletion requested without the confirmation phrase." >&2
+              exit 1
+            fi
+            require_protection supabase-dev-destructive
+            deletion=true
+          fi
+          echo "deletion=$deletion" >>"$GITHUB_OUTPUT"
+          echo "Gate passed (deletion=$deletion)."
+
+  live:
+    name: Live suite (non-destructive)
+    needs: gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: supabase-dev
+    steps:
+      - name: Check out the approved commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Confirm the checked-out commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Write masked live configuration (dev project, synthetic users)
+        env:
+          DEV_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          DEV_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
+          DEV_REF: ${{ vars.BILLFERN_DEV_PROJECT_REF }}
+          PROD_REF: ${{ vars.BILLFERN_PROD_PROJECT_REF }}
+          A_EMAIL: ${{ secrets.DEV_TEST_USER_A_EMAIL }}
+          A_PASSWORD: ${{ secrets.DEV_TEST_USER_A_PASSWORD }}
+          B_EMAIL: ${{ secrets.DEV_TEST_USER_B_EMAIL }}
+          B_PASSWORD: ${{ secrets.DEV_TEST_USER_B_PASSWORD }}
+          D_EMAIL: ${{ secrets.DEV_TEST_DELETE_EMAIL }}
+          D_PASSWORD: ${{ secrets.DEV_TEST_DELETE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in "$DEV_URL" "$DEV_KEY" "$DEV_REF" "$A_EMAIL" "$B_EMAIL" "$D_EMAIL"; do
+            [ -n "$value" ] && echo "::add-mask::$value"
+          done
+          [ -n "${DEV_REF:-}" ] && echo "::add-mask::$DEV_REF.supabase.co"
+          if [ -z "${DEV_REF:-}" ] || [ -z "$DEV_URL" ] || [ -z "$DEV_KEY" ]; then
+            echo "Dev project configuration is incomplete." >&2
+            exit 1
+          fi
+          if [ "$DEV_URL" != "https://$DEV_REF.supabase.co" ]; then
+            echo "DEV_SUPABASE_URL does not match BILLFERN_DEV_PROJECT_REF." >&2
+            exit 1
+          fi
+          if [ -n "${PROD_REF:-}" ] && [ "$PROD_REF" = "$DEV_REF" ]; then
+            echo "Refusing to run: the configured project is production." >&2
+            exit 1
+          fi
+          emails=("$A_EMAIL" "$B_EMAIL")
+          [ -n "$D_EMAIL" ] && emails+=("$D_EMAIL")
+          if [ "$GITHUB_JOB" = "deletion" ] && [ -z "$D_EMAIL" ]; then
+            echo "Account deletion needs the synthetic deleteMe user." >&2
+            exit 1
+          fi
+          for email in "${emails[@]}"; do
+            case "$email" in
+              billfern-test-*@*) ;;
+              *) echo "Test users must be synthetic (billfern-test-*)." >&2; exit 1 ;;
+            esac
+          done
+          umask 077
+          dir="$RUNNER_TEMP/billfern-live"
+          mkdir -p "$dir"
+          jq -n --arg url "$DEV_URL" --arg key "$DEV_KEY" \
+            '{SUPABASE_URL: $url, SUPABASE_PUBLISHABLE_KEY: $key}' >"$dir/supabase.json"
+          jq -n --arg ae "$A_EMAIL" --arg ap "$A_PASSWORD" \
+                --arg be "$B_EMAIL" --arg bp "$B_PASSWORD" \
+                --arg de "$D_EMAIL" --arg dp "$D_PASSWORD" \
+            '{userA: {email: $ae, password: $ap}, userB: {email: $be, password: $bp}}
+             + (if $de != "" then {deleteMe: {email: $de, password: $dp}} else {} end)' \
+            >"$dir/users.json"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install packages (lockfile enforced)
+        run: flutter pub get --enforce-lockfile
+
+      - name: Live suite against the dev project
+        env:
+          BILLFERN_LIVE_CONFIG: ${{ runner.temp }}/billfern-live/supabase.json
+          BILLFERN_LIVE_USERS: ${{ runner.temp }}/billfern-live/users.json
+          BILLFERN_LIVE_REQUIRED: "true"
+          BILLFERN_LIVE_DELETION: ${{ github.job == 'deletion' && 'run' || 'skip' }}
+          TEST_FILTER: ${{ github.job == 'deletion' && env.DELETION_TEST || '' }}
+        run: |
+          if [ -n "$TEST_FILTER" ]; then
+            flutter test --concurrency=1 test_live/live_supabase_test.dart \
+              --plain-name "$TEST_FILTER" \
+              --file-reporter "json:$RUNNER_TEMP/live-report.json"
+          else
+            flutter test --concurrency=1 test_live/live_supabase_test.dart \
+              --file-reporter "json:$RUNNER_TEMP/live-report.json"
+          fi
+
+      - name: Verify the expected tests ran
+        run: |
+          if [ "$GITHUB_JOB" = "deletion" ]; then
+            grep -F "$DELETION_TEST" tool/ci/live_suite_tests.txt >"$RUNNER_TEMP/expected.txt"
+            python3 tool/ci/check_test_report.py "$RUNNER_TEMP/live-report.json" \
+              --expect "$RUNNER_TEMP/expected.txt" --min-tests 1
+          else
+            python3 tool/ci/check_test_report.py "$RUNNER_TEMP/live-report.json" \
+              --expect tool/ci/live_suite_tests.txt --min-tests 10 \
+              --allow-skip "$DELETION_TEST"
+          fi
+
+      - name: Remove live configuration
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/billfern-live"
+
+  deletion:
+    name: Account deletion (destructive, separately approved)
+    needs: [gate, live]
+    if: needs.gate.outputs.deletion == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: supabase-dev-destructive
+    steps:
+      - name: Check out the approved commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Confirm the checked-out commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Write masked live configuration (dev project, synthetic users)
+        env:
+          DEV_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          DEV_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
+          DEV_REF: ${{ vars.BILLFERN_DEV_PROJECT_REF }}
+          PROD_REF: ${{ vars.BILLFERN_PROD_PROJECT_REF }}
+          A_EMAIL: ${{ secrets.DEV_TEST_USER_A_EMAIL }}
+          A_PASSWORD: ${{ secrets.DEV_TEST_USER_A_PASSWORD }}
+          B_EMAIL: ${{ secrets.DEV_TEST_USER_B_EMAIL }}
+          B_PASSWORD: ${{ secrets.DEV_TEST_USER_B_PASSWORD }}
+          D_EMAIL: ${{ secrets.DEV_TEST_DELETE_EMAIL }}
+          D_PASSWORD: ${{ secrets.DEV_TEST_DELETE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in "$DEV_URL" "$DEV_KEY" "$DEV_REF" "$A_EMAIL" "$B_EMAIL" "$D_EMAIL"; do
+            [ -n "$value" ] && echo "::add-mask::$value"
+          done
+          [ -n "${DEV_REF:-}" ] && echo "::add-mask::$DEV_REF.supabase.co"
+          if [ -z "${DEV_REF:-}" ] || [ -z "$DEV_URL" ] || [ -z "$DEV_KEY" ]; then
+            echo "Dev project configuration is incomplete." >&2
+            exit 1
+          fi
+          if [ "$DEV_URL" != "https://$DEV_REF.supabase.co" ]; then
+            echo "DEV_SUPABASE_URL does not match BILLFERN_DEV_PROJECT_REF." >&2
+            exit 1
+          fi
+          if [ -n "${PROD_REF:-}" ] && [ "$PROD_REF" = "$DEV_REF" ]; then
+            echo "Refusing to run: the configured project is production." >&2
+            exit 1
+          fi
+          emails=("$A_EMAIL" "$B_EMAIL")
+          [ -n "$D_EMAIL" ] && emails+=("$D_EMAIL")
+          if [ "$GITHUB_JOB" = "deletion" ] && [ -z "$D_EMAIL" ]; then
+            echo "Account deletion needs the synthetic deleteMe user." >&2
+            exit 1
+          fi
+          for email in "${emails[@]}"; do
+            case "$email" in
+              billfern-test-*@*) ;;
+              *) echo "Test users must be synthetic (billfern-test-*)." >&2; exit 1 ;;
+            esac
+          done
+          umask 077
+          dir="$RUNNER_TEMP/billfern-live"
+          mkdir -p "$dir"
+          jq -n --arg url "$DEV_URL" --arg key "$DEV_KEY" \
+            '{SUPABASE_URL: $url, SUPABASE_PUBLISHABLE_KEY: $key}' >"$dir/supabase.json"
+          jq -n --arg ae "$A_EMAIL" --arg ap "$A_PASSWORD" \
+                --arg be "$B_EMAIL" --arg bp "$B_PASSWORD" \
+                --arg de "$D_EMAIL" --arg dp "$D_PASSWORD" \
+            '{userA: {email: $ae, password: $ap}, userB: {email: $be, password: $bp}}
+             + (if $de != "" then {deleteMe: {email: $de, password: $dp}} else {} end)' \
+            >"$dir/users.json"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install packages (lockfile enforced)
+        run: flutter pub get --enforce-lockfile
+
+      - name: Live suite against the dev project
+        env:
+          BILLFERN_LIVE_CONFIG: ${{ runner.temp }}/billfern-live/supabase.json
+          BILLFERN_LIVE_USERS: ${{ runner.temp }}/billfern-live/users.json
+          BILLFERN_LIVE_REQUIRED: "true"
+          BILLFERN_LIVE_DELETION: ${{ github.job == 'deletion' && 'run' || 'skip' }}
+          TEST_FILTER: ${{ github.job == 'deletion' && env.DELETION_TEST || '' }}
+        run: |
+          if [ -n "$TEST_FILTER" ]; then
+            flutter test --concurrency=1 test_live/live_supabase_test.dart \
+              --plain-name "$TEST_FILTER" \
+              --file-reporter "json:$RUNNER_TEMP/live-report.json"
+          else
+            flutter test --concurrency=1 test_live/live_supabase_test.dart \
+              --file-reporter "json:$RUNNER_TEMP/live-report.json"
+          fi
+
+      - name: Verify the expected tests ran
+        run: |
+          if [ "$GITHUB_JOB" = "deletion" ]; then
+            grep -F "$DELETION_TEST" tool/ci/live_suite_tests.txt >"$RUNNER_TEMP/expected.txt"
+            python3 tool/ci/check_test_report.py "$RUNNER_TEMP/live-report.json" \
+              --expect "$RUNNER_TEMP/expected.txt" --min-tests 1
+          else
+            python3 tool/ci/check_test_report.py "$RUNNER_TEMP/live-report.json" \
+              --expect tool/ci/live_suite_tests.txt --min-tests 10 \
+              --allow-skip "$DELETION_TEST"
+          fi
+
+      - name: Remove live configuration
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/billfern-live"

@@ -1,0 +1,14 @@
+# Every test in test_live/live_supabase_test.dart, by full name (group + test).
+# CI fails unless each one runs and passes exactly once. Keep in sync with the
+# suite when tests are added, renamed or removed.
+authentication password test users can sign in; wrong passwords cannot
+database security (real RLS and privileges) anonymous clients cannot read or call anything private
+database security (real RLS and privileges) another account cannot read, write or reference my records
+synchronization two devices: create, pull, history and mixed currencies
+synchronization offline changes survive and duplicates are applied once
+synchronization conflicts are detected and resolved explicitly
+synchronization tombstones stop outdated devices from restoring deletions
+synchronization guest data migrates with consent, history intact
+synchronization display currency round-trips between devices
+account deletion requires an authenticated session
+account deletion deletes only the owner after confirmation; stale tokens cannot recreate data

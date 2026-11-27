@@ -126,6 +126,8 @@ config/supabase.example.json         # build-time config template (real file is 
 supabase/migrations/                 # versioned SQL: schema, RLS, sync functions
 supabase/functions/delete-account/   # Edge Function: trusted account deletion
 supabase/tests/database/             # pgTAP RLS tests (supabase test db)
+.github/workflows/                   # backend-ci (isolated, active), backend-live-dev (prepared, inactive)
+tool/ci/                             # CI helpers: synthetic users, function probe, test-report checker
 ```
 
 ### Routing
@@ -788,10 +790,36 @@ flutter test
     `supabase/tests/database/rls.test.sql` (pgTAP) and by the **live suite**
     `test_live/live_supabase_test.dart`. Run it with
     `flutter test test_live/live_supabase_test.dart --concurrency=1`.
-  - The live suite uses the dev project, dedicated test users from
-    `config/supabase.test.local.json` (git-ignored) and synthetic data only. It skips
-    when not configured. Never point it at production, and don't claim RLS works from
-    Flutter tests alone.
+  - The live suite uses dedicated test users from
+    `config/supabase.test.local.json` (git-ignored) and synthetic data only:
+    - It skips when not configured; `BILLFERN_LIVE_REQUIRED=true` makes that a
+      failure instead.
+    - Every user email must start with `billfern-test-`, or it refuses to run.
+    - The destructive deletion test runs only with `BILLFERN_LIVE_DELETION=run`.
+    - `BILLFERN_LIVE_CONFIG` and `BILLFERN_LIVE_USERS` override the paths.
+    - Never point it at production, and don't claim RLS works from Flutter tests
+      alone.
+- **CI** (see README "Continuous integration"):
+  - **Track 1** (`.github/workflows/backend-ci.yml`) runs on GitHub-hosted Ubuntu
+    against a **disposable** local Supabase stack, with no secrets. It covers:
+    - the mocked sync and account suites
+    - migrations from scratch
+    - all 37 pgTAP checks
+    - the full live suite, including account deletion
+  - **Track 2** (`.github/workflows/backend-live-dev.yml`) targets the dev project:
+    manual dispatch, fails closed, not active until approved, with a separately
+    approved destructive job.
+  - `tool/ci/check_test_report.py` fails on any skipped, missing or failed test.
+    Keep `tool/ci/live_suite_tests.txt` and `EXPECTED_PGTAP_TESTS` in sync when
+    adding tests.
+  - Path filters cover every backend dependency; extend them when the sync or
+    account code moves.
+  - Pinned versions: Flutter 3.47.2, Supabase CLI 2.113.0, Postgres 17
+    (`supabase/config.toml`, matching the dev project). Actions are pinned to commit
+    SHAs.
+  - Never use `pull_request_target`, upload configuration or logs as artifacts, or
+    store service-role keys, database passwords or access tokens in CI.
+  - Local Docker is never required: database tests run only in CI.
 - Catalog tests (`test/shared/data/`) check that every bundled logo path exists, the
   required services are present, there are no prices, and search ranking. Logo tests
   cover the resolution order and missing-asset fallbacks.

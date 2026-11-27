@@ -1,6 +1,15 @@
 {
-  "_comment": "Copy to config/supabase.test.local.json (git-ignored). Use dedicated TEST users in the billfern-dev project only (Authentication > Users > Add user, auto-confirm). Never real personal or financial data. deleteMe is permanently deleted by the test; recreate it before each run.",
-  "userA": { "email": "billfern-test-a@example.com", "password": "use-a-long-random-test-password" },
-  "userB": { "email": "billfern-test-b@example.com", "password": "use-a-long-random-test-password" },
-  "deleteMe": { "email": "billfern-test-delete@example.com", "password": "use-a-long-random-test-password" }
+  "_comment": "Copy to config/supabase.test.local.json (git-ignored). Use dedicated TEST users in the billfern-dev project only (Authentication > Users > Add user, auto-confirm). Every email must start with 'billfern-test-' or the live suite refuses to run. Never real personal or financial data. The deleteMe user is permanently deleted only when BILLFERN_LIVE_DELETION=run; recreate it before each such run.",
+  "userA": {
+    "email": "billfern-test-a@example.com",
+    "password": "use-a-long-random-test-password"
+  },
+  "userB": {
+    "email": "billfern-test-b@example.com",
+    "password": "use-a-long-random-test-password"
+  },
+  "deleteMe": {
+    "email": "billfern-test-delete@example.com",
+    "password": "use-a-long-random-test-password"
+  }
 }

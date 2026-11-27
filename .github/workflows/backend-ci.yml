@@ -1,0 +1,173 @@
+# Track 1 — isolated backend validation on a DISPOSABLE local Supabase stack.
+#
+# Runs on GitHub-hosted Linux runners only. Uses no repository secrets and no
+# remote Supabase credentials: the stack, its keys and its synthetic users are
+# created for the run and discarded with the runner.
+#
+# Validates: migrations from scratch, every pgTAP RLS check, cross-account
+# isolation, subscription sync, offline recovery, conflict resolution,
+# guest-to-account migration, display-currency sync and end-to-end account
+# deletion (test_live/live_supabase_test.dart), plus the mocked sync and
+# account suites.
+name: Backend CI (isolated)
+
+on:
+  push:
+    branches: [main, feat/backend]
+    paths:
+      - "supabase/**"
+      - "test_live/**"
+      - "lib/features/sync/**"
+      - "lib/features/account/**"
+      - "lib/core/**"
+      - "lib/shared/**"
+      - "lib/main.dart"
+      - "test/features/sync/**"
+      - "test/features/account/**"
+      - "test/helpers/**"
+      - "test/flutter_test_config.dart"
+      - "config/*.example.json"
+      - "tool/ci/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main, feat/backend]
+    paths:
+      - "supabase/**"
+      - "test_live/**"
+      - "lib/features/sync/**"
+      - "lib/features/account/**"
+      - "lib/core/**"
+      - "lib/shared/**"
+      - "lib/main.dart"
+      - "test/features/sync/**"
+      - "test/features/account/**"
+      - "test/helpers/**"
+      - "test/flutter_test_config.dart"
+      - "config/*.example.json"
+      - "tool/ci/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.47.2"
+  SUPABASE_CLI_VERSION: "2.113.0"
+  EXPECTED_PGTAP_TESTS: "37"
+  MIN_MOCKED_TESTS: "95"
+  # Services the backend tests do not need (Postgres, Auth, PostgREST, the
+  # gateway and the Edge runtime stay on).
+  SUPABASE_EXCLUDE: "realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,logflare,vector,supavisor"
+
+jobs:
+  backend:
+    name: Migrations, RLS and live suite (local stack)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install packages (lockfile enforced)
+        run: flutter pub get --enforce-lockfile
+
+      - name: Mocked sync and account suites
+        run: |
+          flutter test --concurrency=2 \
+            test/features/sync test/features/account \
+            --file-reporter "json:$RUNNER_TEMP/mocked-report.json"
+
+      - name: Verify the mocked suites ran
+        run: |
+          python3 tool/ci/check_test_report.py "$RUNNER_TEMP/mocked-report.json" \
+            --min-tests "$MIN_MOCKED_TESTS"
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Start the disposable local stack (applies all migrations)
+        run: supabase start -x "$SUPABASE_EXCLUDE"
+
+      - name: Verify every migration was applied from scratch
+        run: |
+          set -euo pipefail
+          expected=$(ls supabase/migrations/*.sql | sed -E 's#.*/([0-9]+)_.*#\1#' | sort)
+          applied=$(docker exec supabase_db_billfern psql -U postgres -d postgres -tAc \
+            "select version from supabase_migrations.schema_migrations order by version")
+          echo "Expected migrations: $(echo "$expected" | wc -l)"
+          echo "Applied migrations:  $(echo "$applied" | grep -c . || true)"
+          if [ "$expected" != "$applied" ]; then
+            echo "Applied migrations do not match supabase/migrations." >&2
+            exit 1
+          fi
+
+      - name: pgTAP RLS and sync-function tests
+        run: |
+          set -euo pipefail
+          planned=$(grep -Eo 'select plan\(([0-9]+)\)' supabase/tests/database/rls.test.sql \
+            | grep -Eo '[0-9]+')
+          if [ "$planned" != "$EXPECTED_PGTAP_TESTS" ]; then
+            echo "rls.test.sql plans $planned checks; expected $EXPECTED_PGTAP_TESTS." >&2
+            exit 1
+          fi
+          supabase test db 2>&1 | tee "$RUNNER_TEMP/pgtap.log"
+          grep -Eq "^Files=1, Tests=${EXPECTED_PGTAP_TESTS}," "$RUNNER_TEMP/pgtap.log"
+          grep -q "^Result: PASS" "$RUNNER_TEMP/pgtap.log"
+          echo "All $EXPECTED_PGTAP_TESTS pgTAP checks ran and passed."
+
+      - name: Create synthetic test users (local stack only)
+        run: |
+          set -euo pipefail
+          umask 077
+          supabase status -o env >"$RUNNER_TEMP/supabase-status.env" 2>/dev/null
+          tool/ci/setup_local_test_users.sh \
+            "$RUNNER_TEMP/supabase-status.env" "$RUNNER_TEMP/billfern-live"
+          rm -f "$RUNNER_TEMP/supabase-status.env"
+
+      - name: Make sure delete-account is served
+        run: tool/ci/ensure_local_functions.sh "$RUNNER_TEMP/billfern-live" "$RUNNER_TEMP"
+
+      - name: Live suite against the local stack (including account deletion)
+        env:
+          BILLFERN_LIVE_CONFIG: ${{ runner.temp }}/billfern-live/supabase.json
+          BILLFERN_LIVE_USERS: ${{ runner.temp }}/billfern-live/users.json
+          BILLFERN_LIVE_REQUIRED: "true"
+          BILLFERN_LIVE_DELETION: "run"
+        run: |
+          flutter test --concurrency=1 test_live/live_supabase_test.dart \
+            --file-reporter "json:$RUNNER_TEMP/live-report.json"
+
+      - name: Verify every live test ran and passed
+        run: |
+          python3 tool/ci/check_test_report.py "$RUNNER_TEMP/live-report.json" \
+            --expect tool/ci/live_suite_tests.txt --min-tests 11
+
+      - name: Remove test configuration
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/billfern-live"
+
+      - name: Stop the local stack
+        if: always()
+        run: supabase stop --no-backup || true
