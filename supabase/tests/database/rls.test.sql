@@ -3,11 +3,39 @@
 -- Run against a LOCAL Supabase stack:   supabase test db
 -- Uses two distinct authenticated users (A, B) and the anonymous role.
 -- Everything runs in one transaction and is rolled back.
+--
+-- Transaction visibility: sync_pull deliberately returns only rows written by
+-- transactions older than every transaction still in progress
+-- (change_xid < snapshot xmin), so a cursor can never skip a concurrent
+-- write. In this file every write belongs to the test's own open transaction,
+-- which is still in progress, so pulls would see nothing. That is asserted
+-- below as a regression check. To exercise delivery, pg_temp.simulate_commit()
+-- re-stamps the fixture rows as if written by an already-finished
+-- transaction. It touches only this transaction's rows and is rolled back.
 
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(40);
+
+-- Re-stamps rows written by this (still open) transaction with an older,
+-- finished transaction id, as if they had been committed. Runs as the table
+-- owner; the write trigger would otherwise re-stamp the current id.
+create function pg_temp.simulate_commit()
+returns void
+language plpgsql
+as $fn$
+declare
+  v_finished xid8 :=
+    ((pg_snapshot_xmin(pg_current_snapshot())::text::bigint) - 1)::text::xid8;
+begin
+  alter table public.subscriptions disable trigger subscriptions_before_write;
+  update public.subscriptions
+    set change_xid = v_finished
+    where change_xid = pg_current_xact_id();
+  alter table public.subscriptions enable trigger subscriptions_before_write;
+end;
+$fn$;
 
 -- Two users.
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -80,9 +108,28 @@ select is(
     (select p from payload_a)) ->> 'status'),
   'conflict', 'a stale base version is a conflict');
 
+select ok(
+  (select change_xid = pg_current_xact_id() from public.subscriptions where id = 'sub-a'),
+  'every write is stamped with its transaction id');
+
+select is((public.sync_pull(null, 0, 10) -> 'records'), '[]'::jsonb,
+  'a pull never delivers writes of a transaction still in progress');
+
+-- From here on, A's insert counts as committed.
+reset role;
+select pg_temp.simulate_commit();
+set local role authenticated;
+
 select is(
   (public.sync_pull(null, 0, 10) -> 'records' -> 0 -> 'payload' ->> 'priceMinor')::int,
   1549, 'A pulls its own subscription with integer minor units');
+
+select is(
+  (with first as (select public.sync_pull(null, 0, 10) as page)
+   select public.sync_pull(page -> 'cursor' ->> 'xid', (page -> 'cursor' ->> 'seq')::bigint, 10)
+            -> 'records'
+   from first),
+  '[]'::jsonb, 'pulling after the returned cursor repeats nothing');
 
 select lives_ok($$ insert into public.payment_records
   (user_id, subscription_id, subscription_name, amount_minor, currency_code, paid_on, status, source)
@@ -176,6 +223,11 @@ select is(
 select ok(
   (select deleted_at is not null from public.subscriptions where id = 'sub-a'),
   'the tombstone remains');
+
+-- The delete and the rejected edit count as committed from here on.
+reset role;
+select pg_temp.simulate_commit();
+set local role authenticated;
 
 select is(
   (public.sync_pull(null, 0, 10) -> 'records' -> 0 ->> 'deletedAt') is not null,

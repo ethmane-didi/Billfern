@@ -274,7 +274,7 @@ There are two GitHub Actions tracks, kept strictly apart.
   - the mocked sync and account suites (at least 95 tests)
   - every migration applied from scratch, checked against
     `supabase_migrations.schema_migrations`
-  - all **37** pgTAP checks in `supabase/tests/database/rls.test.sql`
+  - all **40** pgTAP checks in `supabase/tests/database/rls.test.sql`
   - the full live suite against the local stack, all 11 tests including end-to-end
     account deletion: cross-account isolation, sync, offline recovery and duplicate
     delivery, conflicts, tombstones, guest migration and display currency
@@ -351,7 +351,7 @@ CI. Migrations and Edge Functions are deployed manually, after approval.
   HTTP timeout).
 
 **Covered by isolated CI** (Track 1, once the workflow is committed and green):
-migrations from scratch, all 37 pgTAP checks, cross-account isolation, sync, offline
+migrations from scratch, all 40 pgTAP checks, cross-account isolation, sync, offline
 recovery, conflicts, guest migration, display currency, and end-to-end account
 deletion on a disposable local stack.
 

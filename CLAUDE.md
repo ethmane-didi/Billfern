@@ -804,11 +804,17 @@ flutter test
     against a **disposable** local Supabase stack, with no secrets. It covers:
     - the mocked sync and account suites
     - migrations from scratch
-    - all 37 pgTAP checks
+    - all 40 pgTAP checks
     - the full live suite, including account deletion
   - **Track 2** (`.github/workflows/backend-live-dev.yml`) targets the dev project:
     manual dispatch, fails closed, not active until approved, with a separately
     approved destructive job.
+  - **pgTAP and transaction visibility:** `sync_pull` never returns rows from a
+    transaction still in progress, and that includes the caller's own transaction.
+    `rls.test.sql` runs in one rolled-back transaction, so it calls
+    `pg_temp.simulate_commit()` before any pull assertion and asserts the
+    in-progress exclusion directly. Never "fix" a pull test by removing the
+    `change_xid < xmin` filter.
   - `tool/ci/check_test_report.py` fails on any skipped, missing or failed test.
     Keep `tool/ci/live_suite_tests.txt` and `EXPECTED_PGTAP_TESTS` in sync when
     adding tests.

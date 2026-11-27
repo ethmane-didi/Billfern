@@ -64,7 +64,7 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.47.2"
   SUPABASE_CLI_VERSION: "2.113.0"
-  EXPECTED_PGTAP_TESTS: "37"
+  EXPECTED_PGTAP_TESTS: "40"
   MIN_MOCKED_TESTS: "95"
   # Services the backend tests do not need (Postgres, Auth, PostgREST, the
   # gateway and the Edge runtime stay on).
