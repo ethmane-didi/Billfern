@@ -108,7 +108,15 @@ jobs:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Start the disposable local stack (applies all migrations)
-        run: supabase start -x "$SUPABASE_EXCLUDE"
+        # The start banner prints the local stack's keys; keep it out of the
+        # public log and show only key-free lines if startup fails.
+        run: |
+          if ! supabase start -x "$SUPABASE_EXCLUDE" >"$RUNNER_TEMP/supabase-start.log" 2>&1; then
+            grep -viE 'key|secret|jwt|password|token' "$RUNNER_TEMP/supabase-start.log" | tail -n 60
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/supabase-start.log"
+          echo "Local stack started."
 
       - name: Verify every migration was applied from scratch
         run: |
