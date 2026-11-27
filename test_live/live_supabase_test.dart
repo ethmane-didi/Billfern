@@ -603,11 +603,30 @@ void main() {
 
         // The account no longer exists…
         await expectLater(signedIn('deleteMe'), throwsA(isA<AuthException>()));
-        // …and its still-valid token cannot recreate records.
-        await victim.save(synthetic(sid('after-delete')));
+        // …and its still-valid token cannot recreate records. The server
+        // rejects the write (the account row is gone, so the foreign key to
+        // auth.users fails); the engine parks the operation rather than
+        // failing the whole run, and the status reports it.
+        final afterId = sid('after-delete');
+        await victim.save(synthetic(afterId));
         final report = await victim.engine.sync();
-        expect(report.succeeded, isFalse);
-        expect(await victim.store.sync!.pending(), isNotEmpty);
+        expect(report.pushed, 0, reason: 'nothing may be applied');
+        final pending = await victim.store.sync!.pending();
+        expect(pending, hasLength(1));
+        expect(pending.single.subscriptionId, afterId);
+        expect(pending.single.parked, isTrue, reason: 'rejected by the server');
+        expect(pending.single.lastError, contains('23503'));
+        final status = await victim.engine.status(phase: SyncPhase.synced);
+        expect(status.phase, SyncPhase.failed);
+        expect(status.parkedCount, 1);
+        expect(
+          await victim.client
+              .from('subscriptions')
+              .select('id')
+              .eq('id', afterId),
+          isEmpty,
+          reason: 'no row exists for the deleted account',
+        );
 
         // Other accounts are untouched.
         final a = await signedIn('userA');
